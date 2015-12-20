@@ -8,7 +8,7 @@ import time
 import logging
 import hmac
 from hashlib import sha256
-
+import re
 import settings
 from handlers.base import AuthRequestException, NoClientConfigException
 from utils import RedisHelper
@@ -104,6 +104,10 @@ class HMACAuthHandler(object):
 
 
 class AuthRequestHandler(object):
+    """
+    对访问请求进行鉴权
+    """
+
     def __int__(self, handler):
         self.handler = handler
 
@@ -135,21 +139,49 @@ class AuthRequestHandler(object):
 
         return endpoint, uri
 
+    def acl_filter(self):
+        """
+        如果启用访问控制列表，就需要检查URI是否允许访问
+        :return:
+        """
+        client = self.handler.client
+        uri = client.request['uri']
+
+        enable_acl = client.config.get('enable_acl', False)
+        if enable_acl:
+            acl_rules = client.config.get('acl_rules', [])
+            # 如果都没有找到匹配的规则，默认返回Tue，放行
+            allow_access = True
+            for r in acl_rules:
+                re_uri, is_permit = r['re_uri'], r['is_permit']
+                pattern = re.compile(re_uri)
+                match = pattern.search(uri)
+                if match:
+                    allow_access = is_permit
+                    break
+
+            # 禁止访问该 uri
+            if not allow_access:
+                logger.info('Forbidden Uri')
+                raise AuthRequestException(403, 'Forbidden Uri')
+
     def process_request(self):
         logger.debug('process_request')
         client = Client(self.handler.request)
         auth_handler = HMACAuthHandler(client)
         auth_handler.auth_request(self.handler.request)
 
+        # 解析 uri
         endpoint, uri = self.parse_uri(client)
-
         client.request = {
             'endpoint': endpoint,
             'uri': uri,
         }
-
         # 设置 client 的相应配置信息
-        self.handler._client = client
+        self.handler.client = client
+
+        # 进行 acl 过滤
+        self.acl_filter()
 
     def process_response(self, chunk):
         logger.debug('process_response')
