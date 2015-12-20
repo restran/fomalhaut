@@ -18,11 +18,12 @@ logger = logging.getLogger(__name__)
 
 class Client(object):
     def __init__(self, request):
-        self.request = request
-        self.access_key = self.request.headers.get('X-Api-Access-Key')
-        self.get_client_info()
+        self.access_key = request.headers.get('X-Api-Access-Key')
+        self.get_client_config()
+        self.config = {}
+        self.request = {}
 
-    def get_client_info(self):
+    def get_client_config(self):
         redis_helper = RedisHelper()
         config_data = redis_helper.get_client_config(self.access_key)
         if config_data is None:
@@ -30,7 +31,7 @@ class Client(object):
 
         secret_key = config_data.get('secret_key')
         setattr(self, 'secret_key', secret_key)
-        setattr(self, 'config_data', config_data)
+        setattr(self, 'config', config_data)
 
 
 class HMACAuthHandler(object):
@@ -82,16 +83,16 @@ class HMACAuthHandler(object):
     def auth_request(self, req, **kwargs):
         timestamp = req.headers.get('X-Api-Timestamp')
         now_ts = int(time.time())
-        if abs(timestamp - now_ts) > settings.TOKEN_EXPIRES_SECONDS:
-            logger.debug('Expired Timestamp %s' % timestamp)
-            raise AuthRequestException(403, 'Expired Timestamp')
+        if abs(timestamp - now_ts) > settings.SIGNATURE_EXPIRE_SECONDS:
+            logger.debug('Expired signature, timestamp: %s' % timestamp)
+            raise AuthRequestException(403, 'Expired Signature')
 
         signature = req.headers.get('X-Api-Signature')
         if signature:
             del req.headers['X-Api-Signature']
         else:
             logger.debug('No signature provide')
-            raise AuthRequestException(403, 'No signature provide')
+            raise AuthRequestException(403, 'No Signature Provide')
 
         string_to_sign = self.string_to_sign(req)
         logger.debug('string_to_sign: %s' % string_to_sign)
@@ -103,15 +104,52 @@ class HMACAuthHandler(object):
 
 
 class AuthRequestHandler(object):
-    @staticmethod
-    def process_request(handler):
-        logger.debug('process_request')
-        client = Client(handler.request)
-        auth_handler = HMACAuthHandler(client)
-        auth_handler.auth_request(handler.request)
-        # 设置 client 的相应配置信息
-        handler._client = client
+    def __int__(self, handler):
+        self.handler = handler
 
-    @staticmethod
-    def process_response(handler, chunk):
+    def parse_uri(self, client):
+        """
+        解析请求的 uri
+        :return:
+        """
+        try:
+            _, req_endpoint, uri = self.handler.request.uri.split('/', 2)
+        except ValueError:
+            raise AuthRequestException(403, 'Invalid Request Uri')
+
+        endpoints = client.config.get('endpoints')
+        endpoint = endpoints.get(req_endpoint)
+        if endpoint is None:
+            raise AuthRequestException(403, 'No Permission to Access %s' % req_endpoint)
+
+        uri_prefix = endpoint.get('uri_prefix')
+        if uri_prefix and uri_prefix != '':
+            try:
+                # 处理 uri 前缀
+                _, uri = uri.split(uri_prefix, 1)
+            except ValueError:
+                raise AuthRequestException(403, 'Invalid Request Uri Prefix')
+
+        if not uri.startswith('/'):
+            uri = '/' + uri
+
+        return endpoint, uri
+
+    def process_request(self):
+        logger.debug('process_request')
+        client = Client(self.handler.request)
+        auth_handler = HMACAuthHandler(client)
+        auth_handler.auth_request(self.handler.request)
+
+        endpoint, uri = self.parse_uri(client)
+
+        client.request = {
+            'endpoint': endpoint,
+            'uri': uri,
+        }
+
+        # 设置 client 的相应配置信息
+        self.handler._client = client
+
+    def process_response(self, chunk):
         logger.debug('process_response')

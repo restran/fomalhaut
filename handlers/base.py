@@ -87,7 +87,7 @@ class BaseHandler(RequestHandler):
             self.finish()
 
     @gen.coroutine
-    def execute_next(self, request, mv_type, process_object, *args, **kwargs):
+    def execute_next(self, request, mv_type, handler, *args, **kwargs):
         try:
             middleware = self._call_mapper.get(mv_type)
             if not middleware:
@@ -96,9 +96,9 @@ class BaseHandler(RequestHandler):
             classes = getattr(self, middleware[0], [])
             logger.debug(classes)
             for c in classes:
-                m = getattr(c(), middleware[1])
+                m = getattr(c(handler), middleware[1])
                 if m and callable(m):
-                    result = m(process_object, *args, **kwargs)
+                    result = m(*args, **kwargs)
                     if is_future(result):
                         yield result
         except gen.Return:
