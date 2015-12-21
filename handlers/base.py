@@ -99,21 +99,20 @@ class BaseHandler(RequestHandler):
             classes = getattr(self, middleware[0], [])
             logger.debug(classes)
             for c in classes:
-                m = getattr(c(handler), middleware[1])
+                instance = c(handler)
+                m = getattr(instance, middleware[1])
                 if m and callable(m):
                     result = m(*args, **kwargs)
                     if is_future(result):
                         yield result
         except gen.Return:
             pass
-        except HTTPError as e:
-            logger.error(traceback.format_exc())
-            logger.error(e)
-            self.write_error(e.status_code, exc_info=sys.exc_info())
         except Exception as e:
             logger.error(traceback.format_exc())
             logger.error(e)
-            self.write_error(500, exc_info=sys.exc_info())
+            # 触发异常后,会自动调用 self.write_error
+            # 这里不需要再调用,否则会出现递归调用 self.write_error
+            # self.write_error(500, exc_info=sys.exc_info())
 
     @gen.coroutine
     def _process_request(self, handler):

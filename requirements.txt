@@ -1,3 +1,4 @@
+requests
 six
 tornado
 redis

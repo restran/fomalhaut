@@ -20,9 +20,11 @@ logger = logging.getLogger(__name__)
 class Client(object):
     def __init__(self, request):
         self.access_key = request.headers.get('X-Api-Access-Key')
-        self.get_client_config()
+        self.secret_key = None
+        logger.debug(self.access_key)
         self.config = {}
         self.request = {}
+        self.get_client_config()
 
     def get_client_config(self):
         redis_helper = RedisHelper()
@@ -30,9 +32,10 @@ class Client(object):
         if config_data is None:
             raise NoClientConfigException(403, 'no client config')
 
-        secret_key = config_data.get('secret_key')
-        setattr(self, 'secret_key', secret_key)
-        setattr(self, 'config', config_data)
+        logger.debug(config_data)
+
+        self.secret_key = config_data.get('secret_key')
+        self.config = config_data
 
 
 class HMACAuthHandler(object):
@@ -82,7 +85,11 @@ class HMACAuthHandler(object):
         return string_to_sign
 
     def auth_request(self, req, **kwargs):
-        timestamp = req.headers.get('X-Api-Timestamp')
+        try:
+            timestamp = int(req.headers.get('X-Api-Timestamp'))
+        except ValueError:
+            raise AuthRequestException(403, 'Invalid X-Api-Timestamp Header')
+
         now_ts = int(time.time())
         if abs(timestamp - now_ts) > settings.SIGNATURE_EXPIRE_SECONDS:
             logger.debug('Expired signature, timestamp: %s' % timestamp)
@@ -108,8 +115,7 @@ class AuthRequestHandler(object):
     """
     对访问请求进行鉴权
     """
-
-    def __int__(self, handler):
+    def __init__(self, handler):
         self.handler = handler
 
     def parse_uri(self, client):
@@ -122,7 +128,7 @@ class AuthRequestHandler(object):
         except ValueError:
             raise AuthRequestException(403, 'Invalid Request Uri')
 
-        endpoints = client.config.get('endpoints')
+        endpoints = client.config.get('endpoints', {})
         endpoint = endpoints.get(req_endpoint)
         if endpoint is None:
             raise AuthRequestException(403, 'No Permission to Access %s' % req_endpoint)
@@ -159,6 +165,8 @@ class AuthRequestHandler(object):
             'forward_url': forward_url,
         }
 
+        logger.debug(request_data)
+
         return request_data
 
     def acl_filter(self):
@@ -192,7 +200,6 @@ class AuthRequestHandler(object):
         client = Client(self.handler.request)
         auth_handler = HMACAuthHandler(client)
         auth_handler.auth_request(self.handler.request)
-
         # 解析 uri,获取该请求实际要转发的地址
         client.request = self.parse_uri(client)
         # 设置 client 的相应配置信息
