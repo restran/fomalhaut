@@ -11,7 +11,7 @@ from hashlib import sha256
 import re
 import settings
 from handlers.base import AuthRequestException, NoClientConfigException
-from utils import RedisHelper
+from utils import RedisHelper, get_utf8_value, text_type
 from urlparse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,8 @@ class HMACAuthHandler(object):
         self.client = client
 
     def sign_string(self, string_to_sign):
-        new_hmac = hmac.new(self.client.secret_key.encode('utf-8'), digestmod=sha256)
-        new_hmac.update(string_to_sign.encode('utf-8'))
+        new_hmac = hmac.new(get_utf8_value(self.client.secret_key), digestmod=sha256)
+        new_hmac.update(get_utf8_value(string_to_sign))
         return new_hmac.hexdigest()
 
     def headers_to_sign(self, request):
@@ -78,10 +78,10 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = self.headers_to_sign(request)
         canonical_headers = self.canonical_headers(headers_to_sign)
-        string_to_sign = '\n'.join([request.method,
-                                    request.uri,
-                                    canonical_headers,
-                                    request.body])
+        string_to_sign = b'\n'.join([get_utf8_value(request.method.upper()),
+                                     get_utf8_value(request.uri),
+                                     get_utf8_value(canonical_headers),
+                                     get_utf8_value(request.body)])
         return string_to_sign
 
     def auth_request(self, req, **kwargs):
@@ -103,8 +103,9 @@ class HMACAuthHandler(object):
             raise AuthRequestException(403, 'No Signature Provide')
 
         string_to_sign = self.string_to_sign(req)
-        logger.debug('string_to_sign: %s' % string_to_sign)
-        hash_value = sha256(string_to_sign.encode('utf-8')).hexdigest()
+        # 如果不是 unicode 输出会引发异常
+        # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
+        hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:
             logger.debug('Signature not match: %s, %s' % (signature, real_signature))
@@ -115,6 +116,7 @@ class AuthRequestHandler(object):
     """
     对访问请求进行鉴权
     """
+
     def __init__(self, handler):
         self.handler = handler
 
