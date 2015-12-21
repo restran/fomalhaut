@@ -13,7 +13,7 @@ import settings
 from handlers.base import AuthRequestException, NoClientConfigException
 from utils import RedisHelper, get_utf8_value, text_type
 from urlparse import urlparse, urlunparse
-
+from middleware import BaseMiddleware
 logger = logging.getLogger(__name__)
 
 
@@ -112,13 +112,10 @@ class HMACAuthHandler(object):
             raise AuthRequestException(403, 'Invalid Signature')
 
 
-class AuthRequestHandler(object):
+class AuthRequestHandler(BaseMiddleware):
     """
     对访问请求进行鉴权
     """
-
-    def __init__(self, handler):
-        self.handler = handler
 
     def parse_uri(self, client):
         """

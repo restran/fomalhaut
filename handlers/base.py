@@ -12,6 +12,7 @@ from tornado.web import RequestHandler
 from tornado.concurrent import is_future
 from tornado import gen
 from tornado.web import HTTPError
+from middleware.analytics import AnalyticsData
 from utils import text_type, copy_list
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class BaseHandler(RequestHandler):
 
         # 请求 client 的相关信息
         self.client = None
+        self.analytics = AnalyticsData()
 
         # 拷贝一份中间件的列表
         self.request_middleware = \
