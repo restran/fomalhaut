@@ -12,6 +12,7 @@ import re
 import settings
 from handlers.base import AuthRequestException, NoClientConfigException
 from utils import RedisHelper
+from urlparse import urlparse, urlunparse
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,28 @@ class AuthRequestHandler(object):
         if not uri.startswith('/'):
             uri = '/' + uri
 
-        return endpoint, uri
+        # 解析要转发的地址
+        endpoint_url = endpoint.get('url')
+        if endpoint_url is None:
+            raise AuthRequestException(403, 'No Endpoint Url Config')
+
+        endpoint_netloc = endpoint.get('netloc')
+        if endpoint_netloc is None:
+            url_parsed = urlparse(endpoint_url)
+            endpoint['netloc'] = url_parsed.netloc
+
+        if endpoint_url.endswith('/'):
+            forward_url = endpoint_url + uri[1:]
+        else:
+            forward_url = endpoint_url + uri
+
+        request_data = {
+            'endpoint': endpoint,
+            'uri': uri,
+            'forward_url': forward_url,
+        }
+
+        return request_data
 
     def acl_filter(self):
         """
@@ -171,12 +193,8 @@ class AuthRequestHandler(object):
         auth_handler = HMACAuthHandler(client)
         auth_handler.auth_request(self.handler.request)
 
-        # 解析 uri
-        endpoint, uri = self.parse_uri(client)
-        client.request = {
-            'endpoint': endpoint,
-            'uri': uri,
-        }
+        # 解析 uri,获取该请求实际要转发的地址
+        client.request = self.parse_uri(client)
         # 设置 client 的相应配置信息
         self.handler.client = client
 
