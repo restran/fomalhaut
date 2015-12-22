@@ -13,36 +13,34 @@ import tornado.httpclient
 import tornado.concurrent
 import tornado.ioloop
 import logging
+from six import binary_type
 
 from tornado.options import define, options
 
+logging.basicConfig(level=logging.DEBUG)
+
 logger = logging.getLogger(__file__)
 
-define("host", default='127.0.0.1', help="run on the given host", type=str)
-define("port", default=8000, help="run on the given port", type=int)
+define('host', default='127.0.0.1', help='run on the given host', type=str)
+define('port', default=8000, help='run on the given port', type=int)
 
 
 class APIHandler(tornado.web.RequestHandler):
     def get(self):
-        self.write("get")
+        self.write('get')
 
     def post(self):
-        self.write('post')
         self.write(self.request.body)
 
 
 if __name__ == '__main__':
     tornado.options.parse_command_line()
     handlers = [
-        (r'/resource', APIHandler),
+        (r'/resource/?', APIHandler),
     ]
     app = tornado.web.Application(handlers=handlers, debug=True)
-    http_server = tornado.httpserver.HTTPServer(app)
-    http_server.listen(options.port)
-    tornado.ioloop.IOLoop.instance().start()
-    options.logging = logging.DEBUG
+    options.logging = binary_type('DEBUG')
     tornado.options.parse_command_line()
-
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
     http_server.listen(options.port, options.host)
 

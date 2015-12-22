@@ -82,7 +82,7 @@ class ClientAuthRequest(object):
         self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         r = requests.get(url, headers=self.request_data.headers)
 
-        print r.content
+        return r
 
     def post(self, uri, headers=None, body=None):
         url = self.get_real_url(uri)
@@ -104,7 +104,7 @@ class ClientAuthRequest(object):
         self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         r = requests.post(url, headers=self.request_data.headers, data=get_utf8_value(body))
 
-        print r.content
+        return r
 
     def sign_string(self, string_to_sign):
         new_hmac = hmac.new(get_utf8_value(self.secret_key), digestmod=sha256)
@@ -157,23 +157,103 @@ class ClientAuthRequest(object):
         return signature
 
 
-class APITest(unittest.TestCase):
-    def test_api_auth(self):
-        access_key = 'abcd'
-        secret_key = '1234'
-        api_server = 'http://127.0.0.1:9000'
-        endpoint = 'test'
-        uri_prefix = 'aaa'
-        r = ClientAuthRequest(access_key, secret_key,
-                              api_server, endpoint, uri_prefix)
-        r.get('/resource')
+class APIAuthTest(unittest.TestCase):
+    """
+    redis 中需要先设置 client 的配置信息
+    key: config:abcd
+    value:
+    {
+        "secret_key": "1234",
+        "access_key": "abcd",
+        "name": "test_client",
+        "id": 123,
+        "enable": true,
+        "endpoints": {
+            "test": {
+                "name": "test",
+                "id": 101,
+                "enable": true,
+                "enable_acl": true,
+                "uri_prefix": "aaa",
+                "url": "http://127.0.0.1:8000",
+                "netloc": "127.0.0.1:8000",
+                "acl_rules": [
+                    {
+                        "re_uri": "^/forbidden.*",
+                        "is_permit": false
+                    },
+                    {
+                        "re_uri": "^/resource",
+                        "is_permit": true
+                    }
+                ]
+            }
+        }
+    }
+    """
+
+    def setUp(self):
+        self.access_key = 'abcd'
+        self.secret_key = '1234'
+        self.api_server = 'http://127.0.0.1:9000'
+        self.endpoint = 'test'
+        self.uri_prefix = 'aaa'
+
+    def test_auth(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint, self.uri_prefix)
+        r = req.get('/resource')
+        self.assertEqual(r.status_code, 200)
+        r = req.get('/resource/not_exist')
+        self.assertEqual(r.status_code, 404)
+
+    def test_signature(self):
+        req = ClientAuthRequest(self.access_key, 'bad secret key',
+                                self.api_server, self.endpoint, self.uri_prefix)
+        r = req.get('/resource/')
+        self.assertEqual(r.status_code, 403)
+
+        req = ClientAuthRequest('bad access key', 'bad secret key',
+                                self.api_server, self.endpoint, self.uri_prefix)
+        r = req.get('/resource/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_acl(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint, self.uri_prefix)
+        r = req.get('/resource')
+        self.assertEqual(r.status_code, 200)
+
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint, self.uri_prefix)
+        r = req.get('/forbidden/')
+        self.assertEqual(r.status_code, 403)
+
+    def test_post_json(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint, self.uri_prefix)
         json_data = {
             'a': 1,
-            'b': '中文'
+            'b': 'test string',
+            'c': '中文'
         }
+
+        body = json.dumps(json_data, ensure_ascii=False)
+        r = req.post('/resource/', body=body)
+
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
+
+    def test_post_img(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint, self.uri_prefix)
+
         with open('img.jpg', 'rb') as f:
             body = f.read()
-            r.post('/resource', body=body)
+            r = req.post('/resource/', body=body)
+
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
 
 
 if __name__ == '__main__':
