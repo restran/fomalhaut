@@ -28,8 +28,7 @@ class Client(object):
         self.get_client_config()
 
     def get_client_config(self):
-        redis_helper = RedisHelper()
-        config_data = redis_helper.get_client_config(self.access_key)
+        config_data = RedisHelper.get_client_config(self.access_key)
         if config_data is None:
             raise ClientBadConfigException(403, 'no client config')
 
@@ -55,8 +54,7 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = {'Host': request.headers.get('Host')}
         for name, value in request.headers.items():
-            l_name = name.lower()
-            if l_name.startswith('x-api'):
+            if name.lower().startswith('x-api'):
                 headers_to_sign[name] = value
         return headers_to_sign
 
@@ -208,6 +206,3 @@ class AuthRequestHandler(BaseMiddleware):
 
         # 进行 acl 过滤
         self.acl_filter()
-
-    def process_response(self, chunk):
-        logger.debug('process_response')

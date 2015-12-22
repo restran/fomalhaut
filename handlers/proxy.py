@@ -4,7 +4,6 @@
 
 from __future__ import unicode_literals
 
-import time
 import logging
 import traceback
 
@@ -16,10 +15,11 @@ import tornado.gen
 import tornado.httpclient
 from tornado.httpclient import HTTPRequest
 from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
+
 from tornado import gen
+
 from middleware.analytics import ResultCode
 from utils import text_type
-from utils import RedisHelper
 import settings
 from handlers.base import BaseHandler
 
@@ -30,11 +30,6 @@ class ProxyHandler(BaseHandler):
     """
     处理代理请求
     """
-    #
-    # def prepare(self):
-    #     super(ProxyHandler, self).prepare()
-    #     if self.middleware_exception and not self._finished:
-    #         self.finish()
 
     @gen.coroutine
     def get(self):
@@ -51,17 +46,18 @@ class ProxyHandler(BaseHandler):
         清理headers中不需要的部分，以及替换值
         :return:
         """
-        headers = dict(self.request.headers)
-
+        headers = self.request.headers
         # 更新host字段为后端访问网站的host
         headers['Host'] = self.client.request['endpoint']['netloc']
-
+        new_headers = {}
         # 如果 header 有的是 str，有的是 unicode
         # 会出现 422 错误
-        for k, v in headers.iteritems():
-            headers[text_type(k)] = text_type(v)
+        for name, value in headers.iteritems():
+            # 过滤 x-api 开头的,这些只是发给 api-gateway
+            if not name.lower().startswith('x-api'):
+                new_headers[text_type(name)] = text_type(value)
 
-        return headers
+        return new_headers
 
     @gen.coroutine
     def _do_fetch(self, method):
@@ -103,60 +99,11 @@ class ProxyHandler(BaseHandler):
                 self._on_proxy(x.response)
             else:
                 self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
-                # self._add_log_data(False)
-                # self._handle_error_page(False)
                 logger.error(u'proxy failed for %s, error: %s' % (forward_url, x))
         except Exception as e:
             logger.error(e)
             logger.error(traceback.format_exc())
             self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
-
-    def _handle_error_page(self, proxy_success):
-        """
-        处理后端网站的错误页面
-        :param proxy_success:
-        :return:
-        """
-        if not proxy_success:
-            # 600 自定义的错误，表示代理失败
-            self.set_status(600, 'Site Unavailable')
-            msg = '服务器遇到了一个问题，工程师正在努力解决'
-            detail_msg_list = ['你可以将遇到的问题反馈给我们，也可以稍后再访问。']
-        else:
-            # 4xx 客户端错误
-            # 5xx 服务端错误
-            if self._status_code < 500:
-                msg = '你请求的页面不存在或无法访问'
-                detail_msg_list = ['你可以返回上级页面，或者将遇到的问题反馈给我们。']
-            else:
-                msg = '服务器遇到了一个问题，工程师正在努力解决'
-                detail_msg_list = ['你可以将遇到的问题反馈给我们，也可以稍后再访问。']
-
-        self.handle_error(status_code=self._status_code, forbidden_request=False,
-                          title=u'%s %s' % (self._status_code, self._reason),
-                          msg=msg, detail_msg_list=detail_msg_list,
-                          status_reason=self._reason)
-
-    def _add_log_data(self, proxy_success, status_code=600):
-        """
-        添加访问日志到redis中
-        :param proxy_success:
-        :param status_code:
-        :return:
-        """
-        if hasattr(self, '_log_data'):
-            redis_helper = RedisHelper()
-            if not proxy_success:
-                self._log_data['result_code'] = settings.ACCESS_RESULT_PROXY_FAILED
-            else:
-                self._log_data['result_code'] = settings.ACCESS_RESULT_SUCCESS
-
-            self._log_data['status_code'] = status_code
-            # 计算耗时
-            self._log_data['elapsed'] = int((time.time() - self._start_time) * 1000)
-            redis_helper.add_analytics_log(self._log_data)
-        else:
-            logger.error('没有 _log_data')
 
     def _on_proxy(self, response):
         forward_url = self.client.request['forward_url']
@@ -164,8 +111,6 @@ class ProxyHandler(BaseHandler):
                 response.error, tornado.httpclient.HTTPError):
             self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
             logger.error(u'proxy failed for %s, error: %s' % (forward_url, response.error))
-            # self._add_log_data(False)
-            # self._handle_error_page(False)
             return
 
         try:
@@ -174,10 +119,8 @@ class ProxyHandler(BaseHandler):
             self.set_status(response.code, response.reason)
         except ValueError:
             self.set_status(response.code, 'Unknown Status Code')
-            logger.info('proxy %s encounters unknown status code,  %s' % (forward_url, response.code))
+            logger.warning('proxy %s encounters unknown status code,  %s' % (forward_url, response.code))
 
-        # logger.debug(".access_token: %s" % self._access_token)
-        # logger.debug("backend response headers: %s" % response.headers)
         for (k, v) in response.headers.get_all():
             # 隐藏后端网站真实服务器名称
             if k == 'Server' or k == 'X-Powered-By':

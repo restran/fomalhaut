@@ -12,20 +12,20 @@ logger = logging.getLogger(__name__)
 
 
 class ClientErrorException(HTTPError):
-    pass
+    """
+    由客户端的错误引发的异常
+    """
 
 
 class ServerErrorException(HTTPError):
-    pass
-
-
-class APIException(HTTPError):
-    pass
+    """
+    由服务端的错误引发的异常
+    """
 
 
 class ClientBadConfigException(ServerErrorException):
     """
-    签名错误,非法的请求
+    Client 配置信息有误,或者不存在
     """
 
 

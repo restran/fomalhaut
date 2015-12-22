@@ -115,4 +115,6 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.uri_prefix = endpoint.get('uri_prefix')
             analytics.forward_url = client.request.get('forward_url')
 
+        # 将统计数据暂时存储在 redis 中
+        RedisHelper.add_analytics_log(analytics.get_json())
         logger.debug(analytics.get_json())

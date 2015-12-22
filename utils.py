@@ -176,22 +176,28 @@ class RedisHelper(object):
     """
     redis 连接助手
     """
-    connection_pool = None
+    _connection_pool = None
 
     def __init__(self):
-        if RedisHelper.connection_pool is None:
-            self.__create_redis_client()
+        if RedisHelper._connection_pool is None:
+            self._create_redis_client()
 
-        self.client = redis.Redis(connection_pool=RedisHelper.connection_pool)
+    @classmethod
+    def get_client(cls):
+        if RedisHelper._connection_pool is None:
+            cls._create_redis_client()
 
-    def get_client_config(self, access_key):
+        return redis.Redis(connection_pool=RedisHelper._connection_pool)
+
+    @classmethod
+    def get_client_config(cls, access_key):
         """
         获取代理配置，这里app_config即access_agent，但是不包含backend_sites
         如果有用到需要另外获取
         :param access_key:
         :return:
         """
-        config_data = self.client.get(
+        config_data = cls.get_client().get(
             '%s:%s' % (settings.PROXY_CONFIG_REDIS_PREFIX, access_key))
 
         logger.debug(config_data)
@@ -204,77 +210,8 @@ class RedisHelper(object):
 
         return None
 
-    def get_site_config(self, access_key, site_name):
-        """
-        获取代理配置
-        :param access_key:
-        :return:
-        """
-        config_data = self.client.get(
-            '%s:%s:%s' % (settings.PROXY_CONFIG_REDIS_PREFIX, access_key, site_name))
-
-        # 数据全部是存json
-        try:
-            site_config = json.loads(config_data) if config_data else None
-
-            return site_config
-        except Exception as e:
-            logger.error(e.message)
-            logger.error(traceback.format_exc())
-
-        return None
-
-    def get_proxy_site_config(self, access_key, site_name):
-        """
-        获取代理配置，这里app_config即access_agent，但是不包含backend_sites
-        如果有用到需要另外获取
-        :param access_key:
-        :param site_name:
-        :return:
-        """
-        config_data = self.client.mget(
-            ['%s:%s' % (settings.PROXY_CONFIG_REDIS_PREFIX, access_key),
-             '%s:%s:%s' % (settings.PROXY_CONFIG_REDIS_PREFIX, access_key, site_name)])
-
-        # 数据全部是存json
-        try:
-            app_config = json.loads(config_data[0]) if config_data[0] else None
-            site_config = json.loads(config_data[1]) if config_data[1] else None
-
-            return app_config, site_config
-        except Exception as e:
-            logger.error(e.message)
-            logger.error(traceback.format_exc())
-
-        return None, None
-
-    def get_agent_backend_sites(self, access_key):
-        """
-        获取access_agent的所有后端站点
-        :param access_key:
-        :return:
-        """
-        pattern_get_backend_sites_lua = """
-        local keys = redis.call('keys', ARGV[1])
-        local values = {}
-        for i = 1, table.getn(keys) do
-            values[i] = redis.call('get', keys[i])
-        end
-        return values
-        """
-        lua = self.client.register_script(pattern_get_backend_sites_lua)
-        backend_sites = lua(keys=[''], args=['%s:%s:*' % (
-            settings.PROXY_CONFIG_REDIS_PREFIX, access_key)], client=self.client)
-        try:
-            backend_sites = [json.loads(t) for t in backend_sites]
-        except Exception as e:
-            logger.error(e.message)
-            logger.error(traceback.format_exc())
-            return []
-
-        return backend_sites
-
-    def add_analytics_log(self, log_item):
+    @classmethod
+    def add_analytics_log(cls, log_item):
         """
         插入统计分析的日志到 redis 中
         :return:
@@ -282,27 +219,28 @@ class RedisHelper(object):
         try:
             json_data = json.dumps(log_item, ensure_ascii=False)
             key = '%s:%s' % (settings.ANALYTICS_LOG_REDIS_PREFIX, ObjectId.get_new_object_id())
-            self.client.setex(key, json_data, settings.ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
+            cls.get_client().setex(key, json_data, settings.ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
             logger.info('add analytics log, %s' % key)
         except Exception as e:
             logger.error(e.message)
             logger.error(traceback.format_exc())
             logger.error('保存统计信息出错')
 
-    def ping_redis(self):
+    @classmethod
+    def ping_redis(cls):
         """
         测试redis能否连通
         :return:
         """
-        self.client.ping()
+        cls.get_client().ping()
 
     @classmethod
-    def __create_redis_client(cls):
+    def _create_redis_client(cls):
         """
         创建连接池
         :return:
         """
-        RedisHelper.connection_pool = redis.ConnectionPool(
+        RedisHelper._connection_pool = redis.ConnectionPool(
             host=settings.REDIS_HOST, port=settings.REDIS_PORT,
             db=settings.REDIS_DB, password=settings.REDIS_PASSWORD)
 
