@@ -17,7 +17,7 @@ import tornado.httpclient
 from tornado.httpclient import HTTPRequest
 from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
 from tornado import gen
-
+from middleware.analytics import ResultCode
 from utils import text_type
 from utils import RedisHelper
 import settings
@@ -30,6 +30,11 @@ class ProxyHandler(BaseHandler):
     """
     处理代理请求
     """
+    #
+    # def prepare(self):
+    #     super(ProxyHandler, self).prepare()
+    #     if self.middleware_exception and not self._finished:
+    #         self.finish()
 
     @gen.coroutine
     def get(self):
@@ -97,12 +102,14 @@ class ProxyHandler(BaseHandler):
             if hasattr(x, 'response') and x.response:
                 self._on_proxy(x.response)
             else:
+                self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
                 # self._add_log_data(False)
                 # self._handle_error_page(False)
                 logger.error(u'proxy failed for %s, error: %s' % (forward_url, x))
         except Exception as e:
             logger.error(e)
             logger.error(traceback.format_exc())
+            self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
 
     def _handle_error_page(self, proxy_success):
         """
@@ -155,6 +162,7 @@ class ProxyHandler(BaseHandler):
         forward_url = self.client.request['forward_url']
         if response.error and not isinstance(
                 response.error, tornado.httpclient.HTTPError):
+            self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
             logger.error(u'proxy failed for %s, error: %s' % (forward_url, response.error))
             # self._add_log_data(False)
             # self._handle_error_page(False)
@@ -200,4 +208,5 @@ class ProxyHandler(BaseHandler):
 
         logger.debug("local response headers: %s" % self._headers)
         self.write(response.body)
+        self.analytics.result_code = ResultCode.OK
         logger.info('proxy success for %s' % forward_url)

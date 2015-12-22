@@ -9,7 +9,7 @@ import hmac
 from hashlib import sha256
 import re
 import settings
-from handlers.base import AuthRequestException, NoClientConfigException
+from middleware.exceptions import *
 from utils import RedisHelper, get_utf8_value, text_type
 from urlparse import urlparse, urlunparse
 from middleware import BaseMiddleware
@@ -19,7 +19,19 @@ logger = logging.getLogger(__name__)
 
 
 class ResultCode(object):
+    # 访问正常
     OK = 200
+    # 请求的参数不完整
+    BAD_REQUEST = 400
+    # 鉴权失败,禁止访问
+    BAD_AUTH_REQUEST = 403
+    # 服务器处理发生异常
+    INTERNAL_SERVER_ERROR = 500
+    # 访问 endpoint server 出现错误
+    REQUEST_ENDPOINT_ERROR = 502
+
+    # client 缺少配置,或配置有误
+    CLIENT_CONFIG_ERROR = 503
 
 
 class AnalyticsData(object):
@@ -73,15 +85,13 @@ class AnalyticsHandler(BaseMiddleware):
         """
         logger.debug('process_request')
         request = self.handler.request
-        analytics = AnalyticsData()
+        analytics = self.handler.analytics
         x_real_ip = request.headers.get('X-Real-Ip')
         remote_ip = request.remote_ip if not x_real_ip else x_real_ip
         analytics.remote_ip = remote_ip
         analytics.request_uri = request.uri
         analytics.method = request.method
         analytics.timestamp = int(time.time() * 1000)
-
-        self.handler.analytics = analytics
 
     def process_finished(self):
         """
@@ -95,12 +105,14 @@ class AnalyticsHandler(BaseMiddleware):
         analytics.elapsed = now_ts - analytics.timestamp
 
         client = self.handler.client
-        analytics.client_name = client.config.get('name')
-        analytics.client_id = client.config.get('id')
-        endpoint = client.request.get('endpoint', {})
-        analytics.endpoint_name = endpoint.get('name')
-        analytics.endpoint_id = endpoint.get('id')
-        analytics.uri_prefix = endpoint.get('uri_prefix')
-        analytics.forward_url = client.request.get('forward_url')
+        # 如果 client 为空表示未能通过鉴权
+        if client is not None:
+            analytics.client_name = client.config.get('name')
+            analytics.client_id = client.config.get('id')
+            endpoint = client.request.get('endpoint', {})
+            analytics.endpoint_name = endpoint.get('name')
+            analytics.endpoint_id = endpoint.get('id')
+            analytics.uri_prefix = endpoint.get('uri_prefix')
+            analytics.forward_url = client.request.get('forward_url')
 
         logger.debug(analytics.get_json())

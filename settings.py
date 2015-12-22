@@ -30,22 +30,10 @@ MIDDLEWARE_CLASSES = [
 LOGGING_LEVEL = 'DEBUG' if DEBUG else 'INFO'
 LOGGING_HANDLERS = ['console'] if DEBUG else ['file']
 
-# header 中的令牌和网站标记
-# HEADER_X_SITE = 'X-Site'
-# HEADER_X_AUTH_TOKEN = 'X-Authorization'
-# HEADER_X_ACCESS_KEY = 'X-Access-Key'
-# HEADER_X_ENCRYPT_TYPE = 'X-Encrypt-Type'
-
-# # 响应结果的签名校验
-# R_HEADER_X_Signature = 'X-Signature'
-# R_HEADER_X_Nonce = 'X-Nonce'
-# R_HEADER_X_Timestamp = 'X-Timestamp'
-
 DEFAULT_TIMEZONE = 'Asia/Shanghai'
 
 # 访问签名的有效时间,秒
 SIGNATURE_EXPIRE_SECONDS = 3600
-
 
 # 这里如果使用localhost会导致速度变慢
 REDIS_HOST = '127.0.0.1'

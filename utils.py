@@ -78,6 +78,24 @@ def get_utf8_value(value):
     else:
         return value
 
+
+def encoded_dict(in_dict):
+    """
+    使用 utf-8 重新编码字典
+    :param in_dict:
+    :return:
+    """
+    out_dict = {}
+    for k, v in in_dict.iteritems():
+        if isinstance(v, unicode):
+            v = v.encode('utf8')
+        elif isinstance(v, str):
+            # Must be encoded in UTF-8
+            v.decode('utf8')
+        out_dict[k] = v
+    return out_dict
+
+
 class AESHelper(object):
     """
     AES 加密助手
@@ -140,23 +158,6 @@ class AESHelper(object):
         return AESHelper.unpad(plain_text)
 
 
-def encoded_dict(in_dict):
-    """
-    使用 utf-8 重新编码字典
-    :param in_dict:
-    :return:
-    """
-    out_dict = {}
-    for k, v in in_dict.iteritems():
-        if isinstance(v, unicode):
-            v = v.encode('utf8')
-        elif isinstance(v, str):
-            # Must be encoded in UTF-8
-            v.decode('utf8')
-        out_dict[k] = v
-    return out_dict
-
-
 class ObjectId(object):
     """
     生成唯一的id，用来存储分析统计日志
@@ -193,6 +194,7 @@ class RedisHelper(object):
         config_data = self.client.get(
             '%s:%s' % (settings.PROXY_CONFIG_REDIS_PREFIX, access_key))
 
+        logger.debug(config_data)
         # 数据全部是存json
         try:
             return json.loads(config_data) if config_data else None
@@ -303,6 +305,7 @@ class RedisHelper(object):
         RedisHelper.connection_pool = redis.ConnectionPool(
             host=settings.REDIS_HOST, port=settings.REDIS_PORT,
             db=settings.REDIS_DB, password=settings.REDIS_PASSWORD)
+
 
 if __name__ == '__main__':
     pass

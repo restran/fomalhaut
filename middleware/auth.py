@@ -10,10 +10,11 @@ import hmac
 from hashlib import sha256
 import re
 import settings
-from handlers.base import AuthRequestException, NoClientConfigException
+from handlers.base import AuthRequestException, ClientBadConfigException
 from utils import RedisHelper, get_utf8_value, text_type
 from urlparse import urlparse, urlunparse
 from middleware import BaseMiddleware
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +31,7 @@ class Client(object):
         redis_helper = RedisHelper()
         config_data = redis_helper.get_client_config(self.access_key)
         if config_data is None:
-            raise NoClientConfigException(403, 'no client config')
+            raise ClientBadConfigException(403, 'no client config')
 
         logger.debug(config_data)
 
@@ -176,9 +177,10 @@ class AuthRequestHandler(BaseMiddleware):
         client = self.handler.client
         uri = client.request['uri']
 
-        enable_acl = client.config.get('enable_acl', False)
+        endpoint = client.request['endpoint']
+        enable_acl = endpoint.get('enable_acl', False)
         if enable_acl:
-            acl_rules = client.config.get('acl_rules', [])
+            acl_rules = endpoint.get('acl_rules', [])
             # 如果都没有找到匹配的规则，默认返回Tue，放行
             allow_access = True
             for r in acl_rules:
@@ -191,7 +193,7 @@ class AuthRequestHandler(BaseMiddleware):
 
             # 禁止访问该 uri
             if not allow_access:
-                logger.info('Forbidden Uri')
+                logger.info('forbidden uri %s' % uri)
                 raise AuthRequestException(403, 'Forbidden Uri')
 
     def process_request(self):

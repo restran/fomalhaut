@@ -7,7 +7,8 @@ from __future__ import unicode_literals
 import logging
 import traceback
 import sys
-
+from middleware.analytics import ResultCode
+from middleware.exceptions import *
 from tornado.web import RequestHandler
 from tornado.concurrent import is_future
 from tornado import gen
@@ -20,27 +21,11 @@ logger = logging.getLogger(__name__)
 _REQUEST, _RESPONSE, _FINISHED = 0, 1, 2
 
 
-class APIException(HTTPError):
-    pass
-
-
-class NoClientConfigException(APIException):
-    """
-    签名错误,非法的请求
-    """
-
-
-class AuthRequestException(APIException):
-    """
-    非法请求,签名错误,时间戳过期
-    """
-
-
 class BaseHandler(RequestHandler):
     _call_mapper = {
         _REQUEST: ('request_middleware', 'process_request'),
         _RESPONSE: ('response_middleware', 'process_response'),
-        _FINISHED: ('finished_middleware', 'process_response'),
+        _FINISHED: ('finished_middleware', 'process_finished'),
     }
 
     def __init__(self, application, request, **kwargs):
@@ -64,6 +49,30 @@ class BaseHandler(RequestHandler):
         self.response_middleware = []
         self.finished_middleware = []
 
+    def clear_nested_middleware(self, mw_class):
+        """
+        清除该中间件下级的所有中间件
+        :param mw_class:
+        :return:
+        """
+
+        for i, m in enumerate(self.request_middleware):
+            if mw_class is m:
+                self.request_middleware = \
+                    self.request_middleware[i + 1:]
+                break
+
+        # response_middleware 和 finished_middleware
+        for i, m in enumerate(self.response_middleware):
+            if mw_class is m:
+                self.response_middleware = self.response_middleware[:i]
+                break
+
+        for i, m in enumerate(self.finished_middleware):
+            if mw_class is m:
+                self.finished_middleware = self.finished_middleware[:i]
+                break
+
     def write_error(self, status_code, **kwargs):
         """Override of RequestHandler.write_error
         :type  status_code: int
@@ -80,12 +89,22 @@ class BaseHandler(RequestHandler):
         self.clear()
         self.set_status(status_code)
 
-        exception = kwargs['exc_info'][1]
+        ex = kwargs['exc_info'][1]
         # any 表示只要有一个为 true 就可以
-        if any(isinstance(exception, c) for c in [HTTPError, APIException]):
+        if any(isinstance(ex, c) for c in
+               [ClientErrorException, ServerErrorException]):
             logger.debug('api exception')
-            self.write('%s %s' % (status_code, get_exc_message(exception)))
+            # 根据异常,设置相应的 result_code
+            if isinstance(ex, AuthRequestException):
+                self.analytics.result_code = ResultCode.BAD_AUTH_REQUEST
+            elif isinstance(ex, ClientBadConfigException):
+                self.analytics.result_code = ResultCode.CLIENT_CONFIG_ERROR
+            elif self.analytics.result_code is None:
+                self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
+
+            self.write('%s %s' % (status_code, get_exc_message(ex)))
         else:
+            self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
             self.write('500 Internal Error')
 
         if not self._finished:
@@ -93,39 +112,45 @@ class BaseHandler(RequestHandler):
 
     @gen.coroutine
     def execute_next(self, request, mv_type, handler, *args, **kwargs):
-        try:
-            middleware = self._call_mapper.get(mv_type)
-            if not middleware:
-                return
+        middleware = self._call_mapper.get(mv_type)
+        if not middleware:
+            return
 
-            classes = getattr(self, middleware[0], [])
-            logger.debug(classes)
-            for c in classes:
-                instance = c(handler)
-                m = getattr(instance, middleware[1])
-                if m and callable(m):
+        classes = getattr(self, middleware[0], [])
+        logger.debug(classes)
+        for c in classes:
+            instance = c(handler)
+            m = getattr(instance, middleware[1])
+            if m and callable(m):
+                try:
                     result = m(*args, **kwargs)
                     if is_future(result):
                         yield result
-        except gen.Return:
-            pass
-        except Exception as e:
-            logger.error(traceback.format_exc())
-            logger.error(e)
-            # 触发异常后,会自动调用 self.write_error
-            # 这里不需要再调用,否则会出现递归调用 self.write_error
-            # self.write_error(500, exc_info=sys.exc_info())
+                except Exception as e:
+                    logger.error(e)
+                    logger.error(traceback.format_exc())
+                    # 在某一层的中间件出现异常,下一级的都不执行
+                    self.clear_nested_middleware(c)
+                    # 如果在 request 阶段就出现了异常,直接进入 finish
+                    if mv_type == _REQUEST and not self._finished:
+                        status_code = getattr(e, 'status_code', 500)
+                        self.write_error(status_code, exc_info=sys.exc_info())
+                    # 不再往下执行
+                    break
 
     @gen.coroutine
     def _process_request(self, handler):
+        logger.debug('_process_request')
         yield self.execute_next(handler.request, _REQUEST, handler)
 
     @gen.coroutine
     def _process_response(self, handler, chunk):
+        logger.debug('_process_response')
         yield self.execute_next(handler.request, _RESPONSE, handler, chunk)
 
     @gen.coroutine
     def _process_finished(self, handler):
+        logger.debug('_process_finished')
         yield self.execute_next(handler.request, _FINISHED, handler)
 
     @gen.coroutine
