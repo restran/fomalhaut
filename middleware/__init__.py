@@ -13,12 +13,12 @@ class BaseMiddleware(object):
 
     """ 子类根据要处理的时机,实现对应的方法
 
-    def process_request(self, *args, *kwargs):
+    def process_request(self, *args, **kwargs):
         pass
 
-    def process_response(self, *args, *kwargs):
+    def process_response(self, *args, **kwargs):
         pass
 
-    def process_finished(self, *args, *kwargs):
+    def process_finished(self, *args, **kwargs):
         pass
     """

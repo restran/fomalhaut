@@ -150,6 +150,9 @@ class ProxyHandler(BaseHandler):
                 self.set_header(k, v)
 
         logger.debug("local response headers: %s" % self._headers)
+        # 更新返回的 headers
+        response.headers = self._headers
+        self.endpoint_response = response
         self.write(response.body)
         self.analytics.result_code = ResultCode.OK
         logger.info('proxy success for %s' % forward_url)

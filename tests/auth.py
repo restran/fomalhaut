@@ -82,6 +82,11 @@ class ClientAuthRequest(object):
         self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         r = requests.get(url, headers=self.request_data.headers)
 
+        if r.status_code != 403:
+            is_valid = self.check_response(r)
+            if not is_valid:
+                logger.debug('返回结果签名不正确')
+
         return r
 
     def post(self, uri, headers=None, body=None):
@@ -103,6 +108,10 @@ class ClientAuthRequest(object):
         self.request_data.headers['X-Api-Signature'] = signature
         self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         r = requests.post(url, headers=self.request_data.headers, data=get_utf8_value(body))
+        if r.status_code != 403:
+            is_valid = self.check_response(r)
+            if not is_valid:
+                logger.debug('返回结果签名不正确')
 
         return r
 
@@ -148,6 +157,32 @@ class ClientAuthRequest(object):
                                      get_utf8_value(self.request_data.body)])
         return string_to_sign
 
+    def response_headers_to_sign(self, headers):
+        """
+        Select the headers from the request that need to be included
+        in the StringToSign.
+        """
+        headers_to_sign = {}
+        for name, value in headers.items():
+            l_name = name.lower()
+            if l_name.startswith('x-api'):
+                headers_to_sign[name] = value
+        return headers_to_sign
+
+    def response_string_to_sign(self, response):
+        """
+        Return the canonical StringToSign as well as a dict
+        containing the original version of all headers that
+        were included in the StringToSign.
+        """
+        headers_to_sign = self.response_headers_to_sign(response.headers)
+        canonical_headers = self.canonical_headers(headers_to_sign)
+        string_to_sign = b'\n'.join([get_utf8_value(self.request_data.method.upper()),
+                                     get_utf8_value(self.request_data.uri),
+                                     get_utf8_value(canonical_headers),
+                                     get_utf8_value(response.content)])
+        return string_to_sign
+
     def signature_request(self):
         string_to_sign = self.string_to_sign()
         # 如果不是 unicode 输出会引发异常
@@ -155,6 +190,38 @@ class ClientAuthRequest(object):
         hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
         signature = self.sign_string(hash_value)
         return signature
+
+    def check_response(self, response):
+        logger.debug(response.headers)
+        try:
+            timestamp = int(response.headers.get('X-Api-Timestamp'))
+        except ValueError:
+            logger.debug('Invalid X-Api-Timestamp Header')
+            return False
+
+        now_ts = int(time.time())
+        if abs(timestamp - now_ts) > settings.SIGNATURE_EXPIRE_SECONDS:
+            logger.debug('Expired signature, timestamp: %s' % timestamp)
+            logger.debug('Expired Signature')
+            return False
+
+        signature = response.headers.get('X-Api-Signature')
+        if signature:
+            del response.headers['X-Api-Signature']
+        else:
+            logger.debug('No signature provide')
+            return False
+
+        string_to_sign = self.response_string_to_sign(response)
+        # 如果不是 unicode 输出会引发异常
+        # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
+        hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
+        real_signature = self.sign_string(hash_value)
+        if signature != real_signature:
+            logger.debug('Signature not match: %s, %s' % (signature, real_signature))
+            return False
+        else:
+            return True
 
 
 class APIAuthTest(unittest.TestCase):
@@ -195,7 +262,7 @@ class APIAuthTest(unittest.TestCase):
     def setUp(self):
         self.access_key = 'abcd'
         self.secret_key = '1234'
-        self.api_server = 'http://127.0.0.1:9000'
+        self.api_server = 'http://127.0.0.1:6500'
         self.endpoint = 'test'
         self.uri_prefix = 'aaa'
 

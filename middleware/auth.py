@@ -9,13 +9,19 @@ import logging
 import hmac
 from hashlib import sha256
 import re
+import random
+from urlparse import urlparse
+
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
 from utils import RedisHelper, get_utf8_value, text_type
-from urlparse import urlparse, urlunparse
 from middleware import BaseMiddleware
 
 logger = logging.getLogger(__name__)
+
+"""
+处理请求的鉴权,ACL过滤
+"""
 
 
 class Client(object):
@@ -30,7 +36,7 @@ class Client(object):
     def get_client_config(self):
         config_data = RedisHelper.get_client_config(self.access_key)
         if config_data is None:
-            raise ClientBadConfigException(403, 'no client config')
+            raise ClientBadConfigException('no client config')
 
         logger.debug(config_data)
 
@@ -47,7 +53,7 @@ class HMACAuthHandler(object):
         new_hmac.update(get_utf8_value(string_to_sign))
         return new_hmac.hexdigest()
 
-    def headers_to_sign(self, request):
+    def _request_headers_to_sign(self, request):
         """
         Select the headers from the request that need to be included
         in the StringToSign.
@@ -58,7 +64,7 @@ class HMACAuthHandler(object):
                 headers_to_sign[name] = value
         return headers_to_sign
 
-    def canonical_headers(self, headers_to_sign):
+    def _canonical_headers(self, headers_to_sign):
         """
         Return the headers that need to be included in the StringToSign
         in their canonical form by converting all header keys to lower
@@ -69,46 +75,69 @@ class HMACAuthHandler(object):
                                 headers_to_sign[n].strip()) for n in headers_to_sign])
         return '\n'.join(l)
 
-    def string_to_sign(self, request):
+    def _request_string_to_sign(self, request):
         """
         Return the canonical StringToSign as well as a dict
         containing the original version of all headers that
         were included in the StringToSign.
         """
-        headers_to_sign = self.headers_to_sign(request)
-        canonical_headers = self.canonical_headers(headers_to_sign)
+        headers_to_sign = self._request_headers_to_sign(request)
+        canonical_headers = self._canonical_headers(headers_to_sign)
         string_to_sign = b'\n'.join([get_utf8_value(request.method.upper()),
                                      get_utf8_value(request.uri),
                                      get_utf8_value(canonical_headers),
                                      get_utf8_value(request.body)])
         return string_to_sign
 
-    def auth_request(self, req, **kwargs):
+    def _response_string_to_sign(self, headers_to_sign, request, response):
+        """
+        Return the canonical StringToSign as well as a dict
+        containing the original version of all headers that
+        were included in the StringToSign.
+        """
+        canonical_headers = self._canonical_headers(headers_to_sign)
+        string_to_sign = b'\n'.join([get_utf8_value(request.method.upper()),
+                                     get_utf8_value(request.uri),
+                                     get_utf8_value(canonical_headers),
+                                     get_utf8_value(response.body)])
+        return string_to_sign
+
+    def signature_response(self, headers_to_sign, request, response):
+        string_to_sign = self._response_string_to_sign(
+            headers_to_sign, request, response)
+
+        # 如果不是 unicode 输出会引发异常
+        # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
+        hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
+        signature = self.sign_string(hash_value)
+        return signature
+
+    def auth_request(self, request):
         try:
-            timestamp = int(req.headers.get('X-Api-Timestamp'))
+            timestamp = int(request.headers.get('X-Api-Timestamp'))
         except ValueError:
-            raise AuthRequestException(403, 'Invalid X-Api-Timestamp Header')
+            raise AuthRequestException('Invalid X-Api-Timestamp Header')
 
         now_ts = int(time.time())
         if abs(timestamp - now_ts) > settings.SIGNATURE_EXPIRE_SECONDS:
             logger.debug('Expired signature, timestamp: %s' % timestamp)
-            raise AuthRequestException(403, 'Expired Signature')
+            raise AuthRequestException('Expired Signature')
 
-        signature = req.headers.get('X-Api-Signature')
+        signature = request.headers.get('X-Api-Signature')
         if signature:
-            del req.headers['X-Api-Signature']
+            del request.headers['X-Api-Signature']
         else:
             logger.debug('No signature provide')
-            raise AuthRequestException(403, 'No Signature Provide')
+            raise AuthRequestException('No Signature Provide')
 
-        string_to_sign = self.string_to_sign(req)
+        string_to_sign = self._request_string_to_sign(request)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:
             logger.debug('Signature not match: %s, %s' % (signature, real_signature))
-            raise AuthRequestException(403, 'Invalid Signature')
+            raise AuthRequestException('Invalid Signature')
 
 
 class AuthRequestHandler(BaseMiddleware):
@@ -116,7 +145,7 @@ class AuthRequestHandler(BaseMiddleware):
     对访问请求进行鉴权
     """
 
-    def parse_uri(self, client):
+    def _parse_uri(self, client):
         """
         解析请求的 uri
         :return:
@@ -124,12 +153,12 @@ class AuthRequestHandler(BaseMiddleware):
         try:
             _, req_endpoint, uri = self.handler.request.uri.split('/', 2)
         except ValueError:
-            raise AuthRequestException(403, 'Invalid Request Uri')
+            raise AuthRequestException('Invalid Request Uri')
 
         endpoints = client.config.get('endpoints', {})
         endpoint = endpoints.get(req_endpoint)
         if endpoint is None:
-            raise AuthRequestException(403, 'No Permission to Access %s' % req_endpoint)
+            raise AuthRequestException('No Permission to Access %s' % req_endpoint)
 
         uri_prefix = endpoint.get('uri_prefix')
         if uri_prefix and uri_prefix != '':
@@ -137,7 +166,7 @@ class AuthRequestHandler(BaseMiddleware):
                 # 处理 uri 前缀
                 _, uri = uri.split(uri_prefix, 1)
             except ValueError:
-                raise AuthRequestException(403, 'Invalid Request Uri Prefix')
+                raise AuthRequestException('Invalid Request Uri Prefix')
 
         if not uri.startswith('/'):
             uri = '/' + uri
@@ -145,7 +174,7 @@ class AuthRequestHandler(BaseMiddleware):
         # 解析要转发的地址
         endpoint_url = endpoint.get('url')
         if endpoint_url is None:
-            raise AuthRequestException(403, 'No Endpoint Url Config')
+            raise AuthRequestException('No Endpoint Url Config')
 
         endpoint_netloc = endpoint.get('netloc')
         if endpoint_netloc is None:
@@ -167,7 +196,7 @@ class AuthRequestHandler(BaseMiddleware):
 
         return request_data
 
-    def acl_filter(self):
+    def _acl_filter(self):
         """
         如果启用访问控制列表，就需要检查URI是否允许访问
         :return:
@@ -192,17 +221,34 @@ class AuthRequestHandler(BaseMiddleware):
             # 禁止访问该 uri
             if not allow_access:
                 logger.info('forbidden uri %s' % uri)
-                raise AuthRequestException(403, 'Forbidden Uri')
+                raise AuthRequestException('Forbidden Uri')
 
-    def process_request(self):
+    def process_request(self, *args, **kwargs):
         logger.debug('process_request')
         client = Client(self.handler.request)
         auth_handler = HMACAuthHandler(client)
         auth_handler.auth_request(self.handler.request)
         # 解析 uri,获取该请求实际要转发的地址
-        client.request = self.parse_uri(client)
+        client.request = self._parse_uri(client)
         # 设置 client 的相应配置信息
         self.handler.client = client
 
         # 进行 acl 过滤
-        self.acl_filter()
+        self._acl_filter()
+
+    def process_response(self, *args, **kwargs):
+        logger.debug('process_response')
+        auth_handler = HMACAuthHandler(self.handler.client)
+        headers = {
+            'X-Api-Timestamp': text_type(int(time.time())),
+            'X-Api-Nonce': text_type(random.random()),
+        }
+        for k, v in headers.iteritems():
+            self.handler.set_header(k, v)
+
+        signature = auth_handler.signature_response(
+            headers, self.handler.request, self.handler.endpoint_response)
+
+        # 对返回结果进行签名
+        self.handler.set_header('X-Api-Signature', signature)
+        logger.debug('process_response_done')

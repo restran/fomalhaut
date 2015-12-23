@@ -13,7 +13,7 @@ BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 TEMPLATE_PATH = os.path.join(BASE_PATH, 'templates')
 
 HOST = '127.0.0.1'
-PORT = 9000
+PORT = 6500
 
 # 是否调试模式
 DEBUG = True
@@ -24,6 +24,9 @@ MIDDLEWARE_CLASSES = [
     'middleware.auth.AuthRequestHandler'
 ]
 
+
+# 未通过网关鉴权时返回的状态码
+AUTH_FAIL_STATUS_CODE = 603
 
 # 可以给日志对象设置日志级别，低于该级别的日志消息将会被忽略
 # CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET

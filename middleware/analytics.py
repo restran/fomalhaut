@@ -1,21 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/21
+
 from __future__ import unicode_literals, absolute_import
 
 import time
-import logging
-import hmac
-from hashlib import sha256
-import re
-import settings
+
 from middleware.exceptions import *
-from utils import RedisHelper, get_utf8_value, text_type
-from urlparse import urlparse, urlunparse
+from utils import RedisHelper
 from middleware import BaseMiddleware
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+"""
+处理访问统计
+"""
 
 
 class ResultCode(object):
@@ -29,7 +28,6 @@ class ResultCode(object):
     INTERNAL_SERVER_ERROR = 500
     # 访问 endpoint server 出现错误
     REQUEST_ENDPOINT_ERROR = 502
-
     # client 缺少配置,或配置有误
     CLIENT_CONFIG_ERROR = 503
 
@@ -78,7 +76,7 @@ class AnalyticsData(object):
 
 
 class AnalyticsHandler(BaseMiddleware):
-    def process_request(self):
+    def process_request(self, *args, **kwargs):
         """
         请求开始
         :return:
@@ -93,7 +91,7 @@ class AnalyticsHandler(BaseMiddleware):
         analytics.method = request.method
         analytics.timestamp = int(time.time() * 1000)
 
-    def process_finished(self):
+    def process_finished(self, *args, **kwargs):
         """
         结果已经返回,处理访问日志
         :return:

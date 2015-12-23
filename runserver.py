@@ -68,8 +68,8 @@ app = Application()
 
 def main():
     # 启动 tornado 之前，先测试 redis 是否能正常工作
-    # r = RedisHelper()
-    # r.ping_redis()
+    r = RedisHelper()
+    r.ping_redis()
 
     # 重新设置一下日志级别，默认情况下，tornado 是 info
     # options.logging 不能是 Unicode

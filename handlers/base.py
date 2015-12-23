@@ -35,6 +35,7 @@ class BaseHandler(RequestHandler):
         # 请求 client 的相关信息
         self.client = None
         self.analytics = AnalyticsData()
+        self.endpoint_response = None
 
         # 拷贝一份中间件的列表
         self.request_middleware = \
