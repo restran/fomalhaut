@@ -22,10 +22,13 @@ _REQUEST, _RESPONSE, _FINISHED = 0, 1, 2
 
 
 class BaseHandler(RequestHandler):
+    # http://stackoverflow.com/questions/22030089/tornado-https-proxy-outputs-405-warning
+    SUPPORTED_METHODS = ("CONNECT", "GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
+
     _call_mapper = {
-        _REQUEST: ('request_middleware', 'process_request'),
-        _RESPONSE: ('response_middleware', 'process_response'),
-        _FINISHED: ('finished_middleware', 'process_finished'),
+        _REQUEST: 'process_request',
+        _RESPONSE: 'process_response',
+        _FINISHED: 'process_finished',
     }
 
     def __init__(self, application, request, **kwargs):
@@ -36,19 +39,8 @@ class BaseHandler(RequestHandler):
         self.client = None
         self.analytics = AnalyticsData()
         self.endpoint_response = None
-
         # 拷贝一份中间件的列表
-        self.request_middleware = \
-            copy_list(self.application.request_middleware)
-        self.response_middleware = \
-            copy_list(self.application.response_middleware)
-        self.finished_middleware = \
-            copy_list(self.application.finished_middleware)
-
-    def clear_all_middleware(self):
-        self.request_middleware = []
-        self.response_middleware = []
-        self.finished_middleware = []
+        self.middleware_list = copy_list(self.application.middleware_list)
 
     def clear_nested_middleware(self, mw_class):
         """
@@ -56,33 +48,23 @@ class BaseHandler(RequestHandler):
         :param mw_class:
         :return:
         """
-        # TODO 清理中间件,必须按照settings中配置的顺序来遍历,不能单独为每个列表遍历
-        
-        logger.debug('clear_nested_middleware!!!')
-        for i, m in enumerate(self.request_middleware):
+        logger.debug('clear_nested_middleware')
+        logger.debug(self.middleware_list)
+        for i, m in enumerate(self.middleware_list):
             if mw_class == m:
-                logger.debug('----hit----')
-                self.request_middleware = \
-                    self.request_middleware[i + 1:]
+                self.middleware_list = self.middleware_list[:i]
                 break
 
-        # response_middleware 和 finished_middleware
-        for i, m in enumerate(self.response_middleware):
-            if mw_class == m:
-                logger.debug('----hit----')
-                self.response_middleware = self.response_middleware[:i]
-                logger.debug(self.response_middleware)
-                break
+        logger.debug(self.middleware_list)
 
-        for i, m in enumerate(self.finished_middleware):
-            if mw_class == m:
-                logger.debug('----hit----')
-                self.finished_middleware = self.finished_middleware[:i]
-                break
+    def get_response_headers(self):
+        return getattr(self, '_headers', [])
 
-        logger.debug(self.request_middleware)
-        logger.debug(self.response_middleware)
-        logger.debug(self.finished_middleware)
+    def clear_write_buffer(self):
+        setattr(self, '_write_buffer', [])
+
+    def get_write_buffer(self):
+        return getattr(self, '_write_buffer', [])
 
     def write_error(self, status_code, **kwargs):
         """Override of RequestHandler.write_error
@@ -98,7 +80,15 @@ class BaseHandler(RequestHandler):
                 hasattr(e, 'log_message') else text_type(e)
 
         self.clear()
-        self.set_status(status_code)
+
+        try:
+            if status_code == AUTH_FAIL_STATUS_CODE:
+                self.set_status(status_code, 'Invalid Request')
+            else:
+                self.set_status(status_code)
+        except Exception as e:
+            logger.error(e)
+            self.set_status(status_code, 'Unknown Status Code')
 
         ex = kwargs['exc_info'][1]
         # any 表示只要有一个为 true 就可以
@@ -123,31 +113,43 @@ class BaseHandler(RequestHandler):
 
     @gen.coroutine
     def execute_next(self, request, mv_type, handler, *args, **kwargs):
-        middleware = self._call_mapper.get(mv_type)
-        if not middleware:
+        method_name = self._call_mapper.get(mv_type)
+        if method_name == 'process_request':
+            middleware_list = self.middleware_list
+        elif method_name in ['process_response', 'process_finished']:
+            # 这两个方法的处理顺序是反序
+            middleware_list = self.middleware_list[-1::-1]
+        else:
             return
-
-        classes = getattr(self, middleware[0], [])
-        logger.debug(classes)
-        for c in classes:
-            instance = c(handler)
-            m = getattr(instance, middleware[1])
-            if m and callable(m):
-                try:
-                    result = m(*args, **kwargs)
-                    if is_future(result):
-                        yield result
-                except Exception as e:
-                    logger.error(e)
-                    logger.error(traceback.format_exc())
-                    # 在某一层的中间件出现异常,下一级的都不执行
-                    self.clear_nested_middleware(c)
-                    # 如果在 request 阶段就出现了异常,直接进入 finish
-                    if mv_type == _REQUEST and not self._finished:
-                        status_code = getattr(e, 'status_code', 500)
-                        self.write_error(status_code, exc_info=sys.exc_info())
-                    # 不再往下执行
-                    break
+        try:
+            for mv_class in middleware_list:
+                instance = mv_class(handler)
+                # 如果不提供 default, 不存在时会出现异常
+                m = getattr(instance, method_name, None)
+                logger.debug('%s, %s, %s' % (mv_class, m, method_name))
+                if m and callable(m):
+                    try:
+                        result = m(*args, **kwargs)
+                        if is_future(result):
+                            yield result
+                    except Exception as e:
+                        logger.error(e)
+                        logger.error(traceback.format_exc())
+                        # 在某一层的中间件出现异常,下一级的都不执行
+                        self.clear_nested_middleware(mv_class)
+                        # 如果在 request 阶段就出现了异常,直接进入 finish
+                        if mv_type == _REQUEST and not self._finished:
+                            status_code = getattr(e, 'status_code', AUTH_FAIL_STATUS_CODE)
+                            logger.debug('exception write error')
+                            self.write_error(status_code, exc_info=sys.exc_info())
+                        # 不再往下执行
+                        break
+        except Exception as e:
+            logger.error(e)
+            logger.error(traceback.format_exc())
+            self.middleware_list = []
+            status_code = getattr(e, 'status_code', AUTH_FAIL_STATUS_CODE)
+            self.write_error(status_code, exc_info=sys.exc_info())
 
     @gen.coroutine
     def _process_request(self, handler):
@@ -173,23 +175,20 @@ class BaseHandler(RequestHandler):
 
     @gen.coroutine
     def finish(self, chunk=None):
-        # finish之前可能执行过多次write，反而chunk可能为None
-        # 真正的chunk数据在self._write_buffer中，包含历次write的数据
-        # 这里将chunk数据write进_write_buffer中，然后将chunk置空
         if chunk:
             self.write(chunk)
             chunk = None
+
         yield self._process_response(self, self._write_buffer)
 
         # 等到最后才 write endpoint 返回的数据
-        if self.endpoint_response is not None:
-            self.write(self.endpoint_response.body)
+        # if self.endpoint_response is not None:
+        #     self.write(self.endpoint_response.body)
 
+        # 执行完父类的 finish 方法后,就会开始调用 on_finish
         super(BaseHandler, self).finish(chunk)
 
-    def write(self, chunk, status=None):
-        if status:
-            self.set_status(status)
+    def write(self, chunk):
         super(BaseHandler, self).write(chunk)
 
     @gen.coroutine

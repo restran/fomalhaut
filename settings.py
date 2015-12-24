@@ -11,6 +11,7 @@ import logging.config
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 # 模板路径
 TEMPLATE_PATH = os.path.join(BASE_PATH, 'templates')
+LOG_PATH = os.path.join(BASE_PATH, 'logs')
 
 HOST = '127.0.0.1'
 PORT = 6500
@@ -67,6 +68,10 @@ ASYNC_HTTP_CONNECT_TIMEOUT = 20.0
 # 整个请求的时间
 ASYNC_HTTP_REQUEST_TIMEOUT = 20.0
 
+if not os.path.exists(LOG_PATH):
+    # 创建日志文件夹
+    os.makedirs(LOG_PATH)
+
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': True,
@@ -101,7 +106,7 @@ logging.config.dictConfig({
             # If delay is true,
             # then file opening is deferred until the first call to emit().
             'delay': True,
-            'filename': os.path.join(os.path.join(BASE_PATH, 'logs'), 'tornado.log'),
+            'filename': os.path.join(LOG_PATH, 'server.log'),
             'formatter': 'verbose'
         }
     },

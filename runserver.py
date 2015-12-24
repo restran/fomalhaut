@@ -35,9 +35,7 @@ class Application(web.Application):
             debug=settings.DEBUG,
         )
 
-        self.request_middleware = []
-        self.response_middleware = []
-        self.finished_middleware = []
+        self.middleware_list = []
         self.load_middleware()
 
         handlers = [(r'/.*', ProxyHandler)]
@@ -50,18 +48,10 @@ class Application(web.Application):
 
         for middleware_path in settings.MIDDLEWARE_CLASSES:
             mw_class = import_string(middleware_path)
+            self.middleware_list.append(mw_class)
 
-            # 将中间件对应的方法存入列表中
-            if hasattr(mw_class, 'process_request'):
-                self.request_middleware.append(mw_class)
-            if hasattr(mw_class, 'process_response'):
-                self.response_middleware.insert(0, mw_class)
-            if hasattr(mw_class, 'process_finished'):
-                self.finished_middleware.insert(0, mw_class)
+        logger.debug(self.middleware_list)
 
-        logger.debug(self.request_middleware)
-        logger.debug(self.response_middleware)
-        logger.debug(self.finished_middleware)
 
 app = Application()
 

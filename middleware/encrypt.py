@@ -13,7 +13,7 @@ from hashlib import sha256
 import re
 import settings
 from handlers.base import AuthRequestException, ServerErrorException
-from utils import RedisHelper, get_utf8_value, text_type
+from utils import RedisHelper, get_utf8_value, text_type, binary_type
 from urlparse import urlparse, urlunparse
 import traceback
 from utils import AESCipher
@@ -28,11 +28,13 @@ logger = logging.getLogger(__name__)
 
 
 class EncryptHandler(BaseMiddleware):
+    """
+    处理解密和加密相关的
+    """
     def process_request(self, *args, **kwargs):
         request = self.handler.request
         client = self.handler.client
         logger.debug('client: %s' % client)
-        client.raw_uri = request.uri
         client.encrypt_type = request.headers.get('X-Api-Encrypt-Type', 'raw')
         if client.encrypt_type != 'aes':
             return
@@ -62,6 +64,29 @@ class EncryptHandler(BaseMiddleware):
                 logger.debug(request.body.encode('hex'))
                 request.body = aes_cipher.decrypt(get_utf8_value(request.body))
 
+            # 重新计算一下 Content-Length
+            # 如果 Content-Length 不正确, 请求后端网站会出错,
+            # 太大会出现超时问题, 太小会出现内容被截断
+            # prepare_content_length(request.body)
+
+        # def prepare_content_length(body):
+        #     """
+        #     requests prepare_content_length
+        #     :param body:
+        #     :return:
+        #     """
+        #     if hasattr(body, 'seek') and hasattr(body, 'tell'):
+        #         body.seek(0, 2)
+        #         request.headers['Content-Length'] = binary_type(body.tell())
+        #         body.seek(0, 0)
+        #     elif body is not None:
+        #         l = len(body)
+        #         if l:
+        #             request.headers['Content-Length'] = binary_type(l)
+        #     elif (request.method not in ('GET', 'HEAD')) and \
+        #             (request.headers.get('Content-Length') is None):
+        #         request.headers['Content-Length'] = '0'
+
         try:
             decrypt_data()
         except Exception as e:
@@ -72,21 +97,24 @@ class EncryptHandler(BaseMiddleware):
 
     def process_response(self, *args, **kwargs):
         client = self.handler.client
-        response = self.handler.endpoint_response
-        if client.encrypt_type == 'raw' \
-                or response.body is None or not len(response.body) > 0:
+        response_body = b''.join(self.handler.get_write_buffer())
+        if client.encrypt_type == 'raw' or not len(response_body) > 0:
             return
 
-        def encrypt_data():
+        def encrypt_data(body):
             # 如果请求的使用 AES 加密，则加密返回的数据
             logger.debug('使用 AES 加密 body')
             aes_cipher = AESCipher(client.secret_key)
-            response.body = aes_cipher.encrypt(get_utf8_value(response.body))
+            body = aes_cipher.encrypt(get_utf8_value(body))
+            # 更新为加密后的数据
+            self.handler.clear_write_buffer()
+            self.handler.write(body)
             self.handler.set_header('X-Api-Encrypt-Type', 'aes')
 
         try:
-            encrypt_data()
+            encrypt_data(response_body)
         except Exception as e:
+            self.handler.clear()
             logger.error('使用 AES 加密 body 出错')
             logger.error(e)
             logger.error(traceback.format_exc())

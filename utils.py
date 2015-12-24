@@ -16,6 +16,7 @@ import types
 from copy import copy
 import base64
 import hashlib
+import io
 
 from Crypto import Random
 from Crypto.Cipher import AES

@@ -54,7 +54,14 @@ class ProxyHandler(BaseHandler):
         # 会出现 422 错误
         for name, value in headers.iteritems():
             # 过滤 x-api 开头的,这些只是发给 api-gateway
-            if not name.lower().startswith('x-api'):
+            if name.lower().startswith('x-api'):
+                pass
+            # 不需要提供 Content-Length, 自动计算
+            # 如果 Content-Length 不正确, 请求后端网站会出错,
+            # 太大会出现超时问题, 太小会出现内容被截断
+            elif name == 'Content-Length':
+                pass
+            else:
                 new_headers[text_type(name)] = text_type(value)
 
         return new_headers
@@ -155,6 +162,7 @@ class ProxyHandler(BaseHandler):
         self.endpoint_response = response
         # 这里不直接 write,等到最后要finish的时候才write
         # 因为在上一级的中间件中会对数据重新处理,比如加密
-        # self.write(response.body)
+        self.write(response.body)
+        logger.debug(response.body.decode('utf-8'))
         self.analytics.result_code = ResultCode.OK
         logger.info('proxy success for %s' % forward_url)

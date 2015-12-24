@@ -9,7 +9,7 @@ import time
 import hmac
 from hashlib import sha256
 from urlparse import urlparse, urlunparse
-
+from settings import PORT as API_SERVER_PORT, AUTH_FAIL_STATUS_CODE
 import requests
 
 from utils import *
@@ -71,16 +71,36 @@ class ClientAuthRequest(object):
         # 加密 Headers 和 url
         self.request_data.headers = {
             'Content-Type': 'application/octet-stream',
-            'X-Encrypted-Headers': aes_cipher.encrypt(get_utf8_value(headers_str)),
-            'X-Encrypted-Uri': aes_cipher.encrypt(get_utf8_value(self.request_data.uri))
+            'X-Api-Encrypted-Headers': aes_cipher.encrypt(get_utf8_value(headers_str)),
+            'X-Api-Encrypted-Uri': aes_cipher.encrypt(get_utf8_value(self.request_data.uri))
         }
+        self.request_data.uri = '/?_t=%d&_nonce=%s' % \
+                                (int(time.time()), text_type(random.random()))
+
         # 设置一个新的 url
-        url = self.api_server.strip() + '/?_t=%d' % int(time.time())
+        url = self.api_server.strip() + self.request_data.uri
 
         if self.request_data.body is not None and len(self.request_data.body) > 0:
+            logger.debug(self.request_data.body)
             self.request_data.body = aes_cipher.encrypt(get_utf8_value(self.request_data.body))
 
         return url
+
+    def decrypt_data(self, body):
+        try:
+            aes_cipher = AESCipher(self.secret_key)
+            if body and len(body) > 0:
+                logger.debug('解密 body')
+                logger.debug(body.encode('hex'))
+                body = aes_cipher.decrypt(get_utf8_value(body))
+                logger.debug(body)
+        except Exception as e:
+            logger.error('解密数据出错')
+            logger.error(e)
+            logger.error(traceback.format_exc())
+            return None
+
+        return body
 
     def get(self, uri, headers=None):
         url = self.get_real_url(uri)
@@ -104,11 +124,15 @@ class ClientAuthRequest(object):
         self.request_data.headers['X-Api-Signature'] = signature
 
         r = requests.get(url, headers=self.request_data.headers)
-
-        if r.status_code != 403:
+        logger.debug(r.status_code)
+        if r.status_code != AUTH_FAIL_STATUS_CODE:
             is_valid = self.check_response(r)
             if not is_valid:
                 logger.debug('返回结果签名不正确')
+
+        r_encrypt_type = r.headers.get('x-api-encrypt-type', 'raw')
+        if r_encrypt_type == 'aes':
+            r._content = self.decrypt_data(r.content)
 
         return r
 
@@ -130,13 +154,24 @@ class ClientAuthRequest(object):
         if self.encrypt_type == 'aes':
             url = self.encrypt_data()
         self.request_data.headers.update(self.get_auth_headers())
+        logger.debug(self.request_data.headers)
         signature = self.signature_request()
         self.request_data.headers['X-Api-Signature'] = signature
-        r = requests.post(url, headers=self.request_data.headers, data=get_utf8_value(body))
-        if r.status_code != 403:
+        r = requests.post(url, headers=self.request_data.headers,
+                          data=get_utf8_value(self.request_data.body))
+
+        logger.debug(url)
+        logger.debug(self.request_data.headers)
+        logger.debug(self.request_data.body)
+
+        if r.status_code != AUTH_FAIL_STATUS_CODE:
             is_valid = self.check_response(r)
             if not is_valid:
                 logger.debug('返回结果签名不正确')
+
+        r_encrypt_type = r.headers.get('x-api-encrypt-type', 'raw')
+        if r_encrypt_type == 'aes':
+            r._content = self.decrypt_data(r.content)
 
         return r
 
@@ -210,6 +245,7 @@ class ClientAuthRequest(object):
 
     def signature_request(self):
         string_to_sign = self.string_to_sign()
+        logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
@@ -238,6 +274,7 @@ class ClientAuthRequest(object):
             return False
 
         string_to_sign = self.response_string_to_sign(response)
+        logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
@@ -287,7 +324,7 @@ class APIAuthTest(unittest.TestCase):
     def setUp(self):
         self.access_key = 'abcd'
         self.secret_key = '1234'
-        self.api_server = 'http://127.0.0.1:6500'
+        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
         self.endpoint = 'test'
         self.uri_prefix = 'aaa'
 
@@ -303,12 +340,12 @@ class APIAuthTest(unittest.TestCase):
         req = ClientAuthRequest(self.access_key, 'bad secret key',
                                 self.api_server, self.endpoint, self.uri_prefix)
         r = req.get('/resource/')
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, AUTH_FAIL_STATUS_CODE)
 
         req = ClientAuthRequest('bad access key', 'bad secret key',
                                 self.api_server, self.endpoint, self.uri_prefix)
         r = req.get('/resource/')
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, AUTH_FAIL_STATUS_CODE)
 
     def test_acl(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
@@ -319,7 +356,7 @@ class APIAuthTest(unittest.TestCase):
         req = ClientAuthRequest(self.access_key, self.secret_key,
                                 self.api_server, self.endpoint, self.uri_prefix)
         r = req.get('/forbidden/')
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, AUTH_FAIL_STATUS_CODE)
 
     def test_post_json(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
@@ -352,7 +389,7 @@ class AESTest(unittest.TestCase):
     def setUp(self):
         self.access_key = 'abcd'
         self.secret_key = '1234'
-        self.api_server = 'http://127.0.0.1:9000'
+        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
         self.endpoint = 'test'
         self.uri_prefix = 'aaa'
 
@@ -370,7 +407,7 @@ class AESTest(unittest.TestCase):
         r = req.post('/resource/', body=body)
 
         self.assertEqual(r.status_code, 200)
-        # self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
+        self.assertEqual(get_utf8_value(body), get_utf8_value(r.content))
 
 
 if __name__ == '__main__':

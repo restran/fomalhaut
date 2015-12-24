@@ -31,13 +31,14 @@ class Client(object):
         logger.debug(self.access_key)
         self.config = {}
         self.request = {}
+        self.raw_uri = request.uri
         self.get_client_config()
 
     def get_client_config(self):
         config_data = RedisHelper.get_client_config(self.access_key)
         if config_data is None:
-            raise ClientBadConfigException(403, 'no client config')
-        raise ClientBadConfigException(403, 'no client config')
+            raise ClientBadConfigException('no client config')
+
         logger.debug(config_data)
 
         self.secret_key = config_data.get('secret_key')
@@ -49,6 +50,7 @@ class HMACAuthHandler(object):
         self.client = client
 
     def sign_string(self, string_to_sign):
+        logger.debug(string_to_sign)
         new_hmac = hmac.new(get_utf8_value(self.client.secret_key), digestmod=sha256)
         new_hmac.update(get_utf8_value(string_to_sign))
         return new_hmac.digest().encode("base64").rstrip('\n')
@@ -60,6 +62,17 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = {'Host': request.headers.get('Host')}
         for name, value in request.headers.items():
+            if name.lower().startswith('x-api'):
+                headers_to_sign[name] = value
+        return headers_to_sign
+
+    def _response_headers_to_sign(self, response_headers):
+        """
+        Select the headers from the request that need to be included
+        in the StringToSign.
+        """
+        headers_to_sign = {}
+        for name, value in response_headers.items():
             if name.lower().startswith('x-api'):
                 headers_to_sign[name] = value
         return headers_to_sign
@@ -89,23 +102,24 @@ class HMACAuthHandler(object):
                                      get_utf8_value(request.body)])
         return string_to_sign
 
-    def _response_string_to_sign(self, headers_to_sign, request, response):
+    def _response_string_to_sign(self, response_headers, request, response_body):
         """
         Return the canonical StringToSign as well as a dict
         containing the original version of all headers that
         were included in the StringToSign.
         """
+        headers_to_sign = self._response_headers_to_sign(response_headers)
         canonical_headers = self._canonical_headers(headers_to_sign)
         string_to_sign = b'\n'.join([get_utf8_value(request.method.upper()),
-                                     get_utf8_value(request.uri),
+                                     get_utf8_value(self.client.raw_uri),
                                      get_utf8_value(canonical_headers),
-                                     get_utf8_value(response.body)])
+                                     get_utf8_value(response_body)])
         return string_to_sign
 
-    def signature_response(self, headers_to_sign, request, response):
+    def signature_response(self, response_header, request, response_body):
         string_to_sign = self._response_string_to_sign(
-            headers_to_sign, request, response)
-
+            response_header, request, response_body)
+        logger.debug(string_to_sign.decode('utf-8'))
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
@@ -238,8 +252,11 @@ class AuthenticateHandler(BaseMiddleware):
 
     def process_request(self, *args, **kwargs):
         logger.debug('process_request')
-        client = Client(self.handler.request)
-        auth_handler = HMACAuthHandler(client)
+        self.handler.client = Client(self.handler.request)
+        auth_handler = HMACAuthHandler(self.handler.client)
+        logger.debug(self.handler.request.uri)
+        logger.debug(dict(self.handler.request.headers))
+        logger.debug(self.handler.request.body)
         auth_handler.auth_request(self.handler.request)
 
     def process_response(self, *args, **kwargs):
@@ -252,8 +269,12 @@ class AuthenticateHandler(BaseMiddleware):
         for k, v in headers.iteritems():
             self.handler.set_header(k, v)
 
+        response_body = b''.join(self.handler.get_write_buffer())
+        logger.debug(response_body.decode('utf-8'))
+        logger.debug(dict(self.handler.get_response_headers()))
         signature = auth_handler.signature_response(
-            headers, self.handler.request, self.handler.endpoint_response)
+            self.handler.get_response_headers(),
+            self.handler.request, response_body)
 
         # 对返回结果进行签名
         self.handler.set_header('X-Api-Signature', signature)

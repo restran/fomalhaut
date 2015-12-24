@@ -26,10 +26,13 @@ define('port', default=8000, help='run on the given port', type=int)
 
 
 class APIHandler(tornado.web.RequestHandler):
+    SUPPORTED_METHODS = ("CONNECT", "GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
+
     def get(self):
         self.write('get')
 
     def post(self):
+        logger.debug(self.request.body)
         self.write(self.request.body)
 
 
