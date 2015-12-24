@@ -56,23 +56,33 @@ class BaseHandler(RequestHandler):
         :param mw_class:
         :return:
         """
-
+        # TODO 清理中间件,必须按照settings中配置的顺序来遍历,不能单独为每个列表遍历
+        
+        logger.debug('clear_nested_middleware!!!')
         for i, m in enumerate(self.request_middleware):
-            if mw_class is m:
+            if mw_class == m:
+                logger.debug('----hit----')
                 self.request_middleware = \
                     self.request_middleware[i + 1:]
                 break
 
         # response_middleware 和 finished_middleware
         for i, m in enumerate(self.response_middleware):
-            if mw_class is m:
+            if mw_class == m:
+                logger.debug('----hit----')
                 self.response_middleware = self.response_middleware[:i]
+                logger.debug(self.response_middleware)
                 break
 
         for i, m in enumerate(self.finished_middleware):
-            if mw_class is m:
+            if mw_class == m:
+                logger.debug('----hit----')
                 self.finished_middleware = self.finished_middleware[:i]
                 break
+
+        logger.debug(self.request_middleware)
+        logger.debug(self.response_middleware)
+        logger.debug(self.finished_middleware)
 
     def write_error(self, status_code, **kwargs):
         """Override of RequestHandler.write_error
@@ -170,6 +180,11 @@ class BaseHandler(RequestHandler):
             self.write(chunk)
             chunk = None
         yield self._process_response(self, self._write_buffer)
+
+        # 等到最后才 write endpoint 返回的数据
+        if self.endpoint_response is not None:
+            self.write(self.endpoint_response.body)
+
         super(BaseHandler, self).finish(chunk)
 
     def write(self, chunk, status=None):

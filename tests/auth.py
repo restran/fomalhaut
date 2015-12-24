@@ -62,6 +62,26 @@ class ClientAuthRequest(object):
                         self.uri_prefix.strip().strip('/')]) + uri.strip()
         return url
 
+    def encrypt_data(self):
+        # if self.encrypt_type == 'raw':
+        #     raise ValueError
+
+        aes_cipher = AESCipher(self.secret_key)
+        headers_str = json.dumps(self.request_data.headers)
+        # 加密 Headers 和 url
+        self.request_data.headers = {
+            'Content-Type': 'application/octet-stream',
+            'X-Encrypted-Headers': aes_cipher.encrypt(get_utf8_value(headers_str)),
+            'X-Encrypted-Uri': aes_cipher.encrypt(get_utf8_value(self.request_data.uri))
+        }
+        # 设置一个新的 url
+        url = self.api_server.strip() + '/?_t=%d' % int(time.time())
+
+        if self.request_data.body is not None and len(self.request_data.body) > 0:
+            self.request_data.body = aes_cipher.encrypt(get_utf8_value(self.request_data.body))
+
+        return url
+
     def get(self, uri, headers=None):
         url = self.get_real_url(uri)
         logger.debug(url)
@@ -69,17 +89,20 @@ class ClientAuthRequest(object):
         self.request_data.uri = self.parse_uri(url)
         self.request_data.method = 'GET'
         if headers is None:
-            headers = self.get_auth_headers()
+            self.request_data.headers = {}
         else:
-            headers.update(self.get_auth_headers())
-
-        # headers 是字典
-        self.request_data.headers = headers
+            # headers 是字典
+            self.request_data.headers = headers
+        self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         self.request_data.body = ''
 
+        if self.encrypt_type == 'aes':
+            url = self.encrypt_data()
+
+        self.request_data.headers.update(self.get_auth_headers())
         signature = self.signature_request()
         self.request_data.headers['X-Api-Signature'] = signature
-        self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
+
         r = requests.get(url, headers=self.request_data.headers)
 
         if r.status_code != 403:
@@ -96,17 +119,19 @@ class ClientAuthRequest(object):
         self.request_data.uri = self.parse_uri(url)
         self.request_data.method = 'POST'
         if headers is None:
-            headers = self.get_auth_headers()
+            self.request_data.headers = {}
         else:
-            headers.update(self.get_auth_headers())
+            # headers 是字典
+            self.request_data.headers = headers
 
-        # headers 是字典
-        self.request_data.headers = headers
+        self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         self.request_data.body = body
 
+        if self.encrypt_type == 'aes':
+            url = self.encrypt_data()
+        self.request_data.headers.update(self.get_auth_headers())
         signature = self.signature_request()
         self.request_data.headers['X-Api-Signature'] = signature
-        self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
         r = requests.post(url, headers=self.request_data.headers, data=get_utf8_value(body))
         if r.status_code != 403:
             is_valid = self.check_response(r)
@@ -118,7 +143,7 @@ class ClientAuthRequest(object):
     def sign_string(self, string_to_sign):
         new_hmac = hmac.new(get_utf8_value(self.secret_key), digestmod=sha256)
         new_hmac.update(get_utf8_value(string_to_sign))
-        return new_hmac.hexdigest()
+        return new_hmac.digest().encode("base64").rstrip('\n')
 
     def headers_to_sign(self):
         """
@@ -321,6 +346,31 @@ class APIAuthTest(unittest.TestCase):
 
             self.assertEqual(r.status_code, 200)
             self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
+
+
+class AESTest(unittest.TestCase):
+    def setUp(self):
+        self.access_key = 'abcd'
+        self.secret_key = '1234'
+        self.api_server = 'http://127.0.0.1:9000'
+        self.endpoint = 'test'
+        self.uri_prefix = 'aaa'
+
+    def test_aes_post(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint,
+                                self.uri_prefix, encrypt_type='aes')
+        json_data = {
+            'a': 1,
+            'b': 'test string',
+            'c': '中文'
+        }
+
+        body = json.dumps(json_data, ensure_ascii=False)
+        r = req.post('/resource/', body=body)
+
+        self.assertEqual(r.status_code, 200)
+        # self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
 
 
 if __name__ == '__main__':

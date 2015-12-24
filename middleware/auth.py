@@ -36,8 +36,8 @@ class Client(object):
     def get_client_config(self):
         config_data = RedisHelper.get_client_config(self.access_key)
         if config_data is None:
-            raise ClientBadConfigException('no client config')
-
+            raise ClientBadConfigException(403, 'no client config')
+        raise ClientBadConfigException(403, 'no client config')
         logger.debug(config_data)
 
         self.secret_key = config_data.get('secret_key')
@@ -51,7 +51,7 @@ class HMACAuthHandler(object):
     def sign_string(self, string_to_sign):
         new_hmac = hmac.new(get_utf8_value(self.client.secret_key), digestmod=sha256)
         new_hmac.update(get_utf8_value(string_to_sign))
-        return new_hmac.hexdigest()
+        return new_hmac.digest().encode("base64").rstrip('\n')
 
     def _request_headers_to_sign(self, request):
         """
@@ -140,7 +140,7 @@ class HMACAuthHandler(object):
             raise AuthRequestException('Invalid Signature')
 
 
-class AuthRequestHandler(BaseMiddleware):
+class PrepareRequestHandler(BaseMiddleware):
     """
     对访问请求进行鉴权
     """
@@ -225,16 +225,22 @@ class AuthRequestHandler(BaseMiddleware):
 
     def process_request(self, *args, **kwargs):
         logger.debug('process_request')
+        # 解析 uri,获取该请求实际要转发的地址
+        self.handler.client.request = self._parse_uri(self.handler.client)
+        # 进行 acl 过滤
+        self._acl_filter()
+
+
+class AuthenticateHandler(BaseMiddleware):
+    """
+    对访问请求进行鉴权
+    """
+
+    def process_request(self, *args, **kwargs):
+        logger.debug('process_request')
         client = Client(self.handler.request)
         auth_handler = HMACAuthHandler(client)
         auth_handler.auth_request(self.handler.request)
-        # 解析 uri,获取该请求实际要转发的地址
-        client.request = self._parse_uri(client)
-        # 设置 client 的相应配置信息
-        self.handler.client = client
-
-        # 进行 acl 过滤
-        self._acl_filter()
 
     def process_response(self, *args, **kwargs):
         logger.debug('process_response')

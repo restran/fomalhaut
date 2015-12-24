@@ -6,19 +6,23 @@ from __future__ import unicode_literals
 
 from base64 import b64encode, b64decode
 from importlib import import_module
-import redis
 import traceback
-from Crypto.Cipher import AES
-import settings
-import time
 import logging
-import re
 import os
 import uuid
 import json
 import sys
 import types
 from copy import copy
+import base64
+import hashlib
+
+from Crypto import Random
+from Crypto.Cipher import AES
+
+import redis
+
+import settings
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +100,31 @@ def encoded_dict(in_dict):
     return out_dict
 
 
+class AESCipher(object):
+    def __init__(self, key):
+        self.bs = 32
+        self.key = hashlib.sha256(key.encode()).digest()
+
+    def encrypt(self, raw):
+        raw = self._pad(raw)
+        iv = Random.new().read(AES.block_size)
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        return base64.b64encode(iv + cipher.encrypt(raw))
+
+    def decrypt(self, enc):
+        enc = base64.b64decode(enc)
+        iv = enc[:AES.block_size]
+        cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        return self._unpad(cipher.decrypt(enc[AES.block_size:])).decode('utf-8')
+
+    def _pad(self, s):
+        return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
+
+    @staticmethod
+    def _unpad(s):
+        return s[:-ord(s[len(s) - 1:])]
+
+
 class AESHelper(object):
     """
     AES 加密助手
@@ -126,17 +155,16 @@ class AESHelper(object):
         """
         message = bytes(message)
         # IV 使用 key 的前16个字节
-        cryptor = AES.new(key, AES.MODE_CBC, key[:16])
+        encryption_suite = AES.new(key, AES.MODE_CBC, key[:16])
         message = AESHelper.pad(message)
-        ciphertext = cryptor.encrypt(message)
-        return b64encode(ciphertext)
+        cipher_text = encryption_suite.encrypt(message)
+        return b64encode(cipher_text)
 
     @staticmethod
-    def decrypt(key, b64_ciphertext):
-        # logger.debug(b64_ciphertext)
-        ciphertext = b64decode(b64_ciphertext)
-        cryptor = AES.new(key, AES.MODE_CBC, key[:16])
-        plain_text = cryptor.decrypt(ciphertext)
+    def decrypt(key, b64_cipher_text):
+        cipher_text = b64decode(b64_cipher_text)
+        decryption_suite = AES.new(key, AES.MODE_CBC, key[:16])
+        plain_text = decryption_suite.decrypt(cipher_text)
         return AESHelper.unpad(plain_text)
 
     @staticmethod

@@ -21,7 +21,9 @@ DEBUG = True
 # 中间件会按顺序执行
 MIDDLEWARE_CLASSES = [
     'middleware.analytics.AnalyticsHandler',
-    'middleware.auth.AuthRequestHandler'
+    'middleware.auth.AuthenticateHandler',
+    'middleware.encrypt.EncryptHandler',
+    'middleware.auth.PrepareRequestHandler',
 ]
 
 

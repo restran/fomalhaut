@@ -153,6 +153,8 @@ class ProxyHandler(BaseHandler):
         # 更新返回的 headers
         response.headers = self._headers
         self.endpoint_response = response
-        self.write(response.body)
+        # 这里不直接 write,等到最后要finish的时候才write
+        # 因为在上一级的中间件中会对数据重新处理,比如加密
+        # self.write(response.body)
         self.analytics.result_code = ResultCode.OK
         logger.info('proxy success for %s' % forward_url)
