@@ -16,11 +16,19 @@ class ClientErrorException(HTTPError):
     由客户端的错误引发的异常
     """
 
+    def __init__(self, log_message, *args, **kwargs):
+        super(ClientErrorException, self).__init__(
+            AUTH_FAIL_STATUS_CODE, log_message, *args, **kwargs)
+
 
 class ServerErrorException(HTTPError):
     """
     由服务端的错误引发的异常
     """
+
+    def __init__(self, log_message, *args, **kwargs):
+        super(ServerErrorException, self).__init__(
+            AUTH_FAIL_STATUS_CODE, log_message, *args, **kwargs)
 
 
 class ClientBadConfigException(ServerErrorException):

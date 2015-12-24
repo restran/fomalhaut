@@ -13,7 +13,7 @@ from hashlib import sha256
 import re
 import settings
 from handlers.base import AuthRequestException, ServerErrorException
-from utils import RedisHelper, get_utf8_value, text_type, binary_type
+from utils import RedisHelper, utf8, text_type, binary_type
 from urlparse import urlparse, urlunparse
 import traceback
 from utils import AESCipher
@@ -31,6 +31,7 @@ class EncryptHandler(BaseMiddleware):
     """
     处理解密和加密相关的
     """
+
     def process_request(self, *args, **kwargs):
         request = self.handler.request
         client = self.handler.client
@@ -43,13 +44,13 @@ class EncryptHandler(BaseMiddleware):
             aes_cipher = AESCipher(client.secret_key)
             encrypted_uri = self.handler.request.headers.get('X-Api-Encrypted-Uri')
             if encrypted_uri:
-                request.uri = aes_cipher.decrypt(get_utf8_value(encrypted_uri))
+                request.uri = aes_cipher.decrypt(utf8(encrypted_uri))
                 logger.debug('decrypted uri %s' % request.uri)
 
             encrypted_headers = self.handler.request.headers.get('X-Api-Encrypted-Headers')
 
             if encrypted_headers:
-                headers_str = aes_cipher.decrypt(get_utf8_value(encrypted_headers))
+                headers_str = aes_cipher.decrypt(utf8(encrypted_headers))
                 headers = dict(json.loads(headers_str))
                 logger.debug('raw headers %s' % request.headers)
                 for k, v in headers.iteritems():
@@ -61,31 +62,11 @@ class EncryptHandler(BaseMiddleware):
 
             if request.body and len(request.body) > 0:
                 logger.debug('解密 body')
-                logger.debug(request.body.encode('hex'))
-                request.body = aes_cipher.decrypt(get_utf8_value(request.body))
+                logger.debug(request.body)
+                request.body = aes_cipher.decrypt(utf8(request.body))
 
-            # 重新计算一下 Content-Length
-            # 如果 Content-Length 不正确, 请求后端网站会出错,
-            # 太大会出现超时问题, 太小会出现内容被截断
-            # prepare_content_length(request.body)
-
-        # def prepare_content_length(body):
-        #     """
-        #     requests prepare_content_length
-        #     :param body:
-        #     :return:
-        #     """
-        #     if hasattr(body, 'seek') and hasattr(body, 'tell'):
-        #         body.seek(0, 2)
-        #         request.headers['Content-Length'] = binary_type(body.tell())
-        #         body.seek(0, 0)
-        #     elif body is not None:
-        #         l = len(body)
-        #         if l:
-        #             request.headers['Content-Length'] = binary_type(l)
-        #     elif (request.method not in ('GET', 'HEAD')) and \
-        #             (request.headers.get('Content-Length') is None):
-        #         request.headers['Content-Length'] = '0'
+                # 解密完之后不需要重新计算 Content-Length,
+                # 因为请求后端 API 时不带 Content-Length
 
         try:
             decrypt_data()
@@ -105,7 +86,7 @@ class EncryptHandler(BaseMiddleware):
             # 如果请求的使用 AES 加密，则加密返回的数据
             logger.debug('使用 AES 加密 body')
             aes_cipher = AESCipher(client.secret_key)
-            body = aes_cipher.encrypt(get_utf8_value(body))
+            body = aes_cipher.encrypt(utf8(body))
             # 更新为加密后的数据
             self.handler.clear_write_buffer()
             self.handler.write(body)
@@ -118,4 +99,4 @@ class EncryptHandler(BaseMiddleware):
             logger.error('使用 AES 加密 body 出错')
             logger.error(e)
             logger.error(traceback.format_exc())
-            raise ServerErrorException(500, 'Encrypt body error')
+            raise ServerErrorException('Encrypt body error')

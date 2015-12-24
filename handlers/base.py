@@ -22,9 +22,6 @@ _REQUEST, _RESPONSE, _FINISHED = 0, 1, 2
 
 
 class BaseHandler(RequestHandler):
-    # http://stackoverflow.com/questions/22030089/tornado-https-proxy-outputs-405-warning
-    SUPPORTED_METHODS = ("CONNECT", "GET", "HEAD", "POST", "DELETE", "PATCH", "PUT", "OPTIONS")
-
     _call_mapper = {
         _REQUEST: 'process_request',
         _RESPONSE: 'process_response',
@@ -147,6 +144,7 @@ class BaseHandler(RequestHandler):
         except Exception as e:
             logger.error(e)
             logger.error(traceback.format_exc())
+            # 出现了预料之外的错误, 清理所有中间件, 结束
             self.middleware_list = []
             status_code = getattr(e, 'status_code', AUTH_FAIL_STATUS_CODE)
             self.write_error(status_code, exc_info=sys.exc_info())
@@ -180,10 +178,6 @@ class BaseHandler(RequestHandler):
             chunk = None
 
         yield self._process_response(self, self._write_buffer)
-
-        # 等到最后才 write endpoint 返回的数据
-        # if self.endpoint_response is not None:
-        #     self.write(self.endpoint_response.body)
 
         # 执行完父类的 finish 方法后,就会开始调用 on_finish
         super(BaseHandler, self).finish(chunk)

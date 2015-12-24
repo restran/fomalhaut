@@ -74,7 +74,6 @@ class ProxyHandler(BaseHandler):
         # 清理和处理一下 header
         headers = self._clean_headers()
         logger.debug('修改后的 headers %s' % headers)
-        logger.debug(self.request.body)
 
         try:
             if method == 'GET':
@@ -163,6 +162,5 @@ class ProxyHandler(BaseHandler):
         # 这里不直接 write,等到最后要finish的时候才write
         # 因为在上一级的中间件中会对数据重新处理,比如加密
         self.write(response.body)
-        logger.debug(response.body.decode('utf-8'))
         self.analytics.result_code = ResultCode.OK
         logger.info('proxy success for %s' % forward_url)

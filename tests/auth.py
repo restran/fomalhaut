@@ -29,6 +29,8 @@ class RequestObject(object):
 
 
 class ClientAuthRequest(object):
+    # TODO 重新整理代码, 将签名和加解密部分分离出来
+
     def __init__(self, access_key, secret_key, api_server,
                  endpoint, uri_prefix='', encrypt_type='raw'):
         self.access_key = access_key
@@ -71,8 +73,8 @@ class ClientAuthRequest(object):
         # 加密 Headers 和 url
         self.request_data.headers = {
             'Content-Type': 'application/octet-stream',
-            'X-Api-Encrypted-Headers': aes_cipher.encrypt(get_utf8_value(headers_str)),
-            'X-Api-Encrypted-Uri': aes_cipher.encrypt(get_utf8_value(self.request_data.uri))
+            'X-Api-Encrypted-Headers': aes_cipher.encrypt(utf8(headers_str)),
+            'X-Api-Encrypted-Uri': aes_cipher.encrypt(utf8(self.request_data.uri))
         }
         self.request_data.uri = '/?_t=%d&_nonce=%s' % \
                                 (int(time.time()), text_type(random.random()))
@@ -81,9 +83,8 @@ class ClientAuthRequest(object):
         url = self.api_server.strip() + self.request_data.uri
 
         if self.request_data.body is not None and len(self.request_data.body) > 0:
+            self.request_data.body = aes_cipher.encrypt(utf8(self.request_data.body))
             logger.debug(self.request_data.body)
-            self.request_data.body = aes_cipher.encrypt(get_utf8_value(self.request_data.body))
-
         return url
 
     def decrypt_data(self, body):
@@ -92,8 +93,8 @@ class ClientAuthRequest(object):
             if body and len(body) > 0:
                 logger.debug('解密 body')
                 logger.debug(body.encode('hex'))
-                body = aes_cipher.decrypt(get_utf8_value(body))
-                logger.debug(body)
+                body = aes_cipher.decrypt(utf8(body))
+                logger.debug(body.encode('hex'))
         except Exception as e:
             logger.error('解密数据出错')
             logger.error(e)
@@ -158,7 +159,7 @@ class ClientAuthRequest(object):
         signature = self.signature_request()
         self.request_data.headers['X-Api-Signature'] = signature
         r = requests.post(url, headers=self.request_data.headers,
-                          data=get_utf8_value(self.request_data.body))
+                          data=utf8(self.request_data.body))
 
         logger.debug(url)
         logger.debug(self.request_data.headers)
@@ -176,8 +177,8 @@ class ClientAuthRequest(object):
         return r
 
     def sign_string(self, string_to_sign):
-        new_hmac = hmac.new(get_utf8_value(self.secret_key), digestmod=sha256)
-        new_hmac.update(get_utf8_value(string_to_sign))
+        new_hmac = hmac.new(utf8(self.secret_key), digestmod=sha256)
+        new_hmac.update(utf8(string_to_sign))
         return new_hmac.digest().encode("base64").rstrip('\n')
 
     def headers_to_sign(self):
@@ -211,10 +212,10 @@ class ClientAuthRequest(object):
         """
         headers_to_sign = self.headers_to_sign()
         canonical_headers = self.canonical_headers(headers_to_sign)
-        string_to_sign = b'\n'.join([get_utf8_value(self.request_data.method.upper()),
-                                     get_utf8_value(self.request_data.uri),
-                                     get_utf8_value(canonical_headers),
-                                     get_utf8_value(self.request_data.body)])
+        string_to_sign = b'\n'.join([utf8(self.request_data.method.upper()),
+                                     utf8(self.request_data.uri),
+                                     utf8(canonical_headers),
+                                     utf8(self.request_data.body)])
         return string_to_sign
 
     def response_headers_to_sign(self, headers):
@@ -237,10 +238,10 @@ class ClientAuthRequest(object):
         """
         headers_to_sign = self.response_headers_to_sign(response.headers)
         canonical_headers = self.canonical_headers(headers_to_sign)
-        string_to_sign = b'\n'.join([get_utf8_value(self.request_data.method.upper()),
-                                     get_utf8_value(self.request_data.uri),
-                                     get_utf8_value(canonical_headers),
-                                     get_utf8_value(response.content)])
+        string_to_sign = b'\n'.join([utf8(self.request_data.method.upper()),
+                                     utf8(self.request_data.uri),
+                                     utf8(canonical_headers),
+                                     utf8(response.content)])
         return string_to_sign
 
     def signature_request(self):
@@ -248,7 +249,7 @@ class ClientAuthRequest(object):
         logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
+        hash_value = sha256(utf8(string_to_sign)).hexdigest()
         signature = self.sign_string(hash_value)
         return signature
 
@@ -277,7 +278,7 @@ class ClientAuthRequest(object):
         logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        hash_value = sha256(get_utf8_value(string_to_sign)).hexdigest()
+        hash_value = sha256(utf8(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:
             logger.debug('Signature not match: %s, %s' % (signature, real_signature))
@@ -371,7 +372,7 @@ class APIAuthTest(unittest.TestCase):
         r = req.post('/resource/', body=body)
 
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
+        self.assertEqual(utf8(r.content), utf8(body))
 
     def test_post_img(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
@@ -382,7 +383,7 @@ class APIAuthTest(unittest.TestCase):
             r = req.post('/resource/', body=body)
 
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(get_utf8_value(r.content), get_utf8_value(body))
+            self.assertEqual(utf8(r.content), utf8(body))
 
 
 class AESTest(unittest.TestCase):
@@ -407,7 +408,28 @@ class AESTest(unittest.TestCase):
         r = req.post('/resource/', body=body)
 
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(get_utf8_value(body), get_utf8_value(r.content))
+        self.assertEqual(utf8(body), utf8(r.content))
+
+    def test_aes_post_img(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint,
+                                self.uri_prefix, encrypt_type='aes')
+
+        with open('img.jpg', 'rb') as f:
+            body = f.read()
+            r = req.post('/resource/', body=body)
+
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(utf8(r.content), utf8(body))
+
+    def test_aes_get(self):
+        req = ClientAuthRequest(self.access_key, self.secret_key,
+                                self.api_server, self.endpoint,
+                                self.uri_prefix, encrypt_type='aes')
+        r = req.get('/resource/')
+
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(utf8('get'), utf8(r.content))
 
 
 if __name__ == '__main__':

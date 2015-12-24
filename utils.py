@@ -4,7 +4,6 @@
 
 from __future__ import unicode_literals
 
-from base64 import b64encode, b64decode
 from importlib import import_module
 import traceback
 import logging
@@ -16,11 +15,9 @@ import types
 from copy import copy
 import base64
 import hashlib
-import io
 
 from Crypto import Random
 from Crypto.Cipher import AES
-
 import redis
 
 import settings
@@ -74,7 +71,7 @@ def import_string(dotted_path):
         raise ImportError(msg)
 
 
-def get_utf8_value(value):
+def utf8(value):
     """Get the UTF8-encoded version of a value."""
     if not isinstance(value, binary_type) and not isinstance(value, text_type):
         value = binary_type(value)
@@ -102,6 +99,9 @@ def encoded_dict(in_dict):
 
 
 class AESCipher(object):
+    """
+    http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
+    """
     def __init__(self, key):
         self.bs = 32
         self.key = hashlib.sha256(key.encode()).digest()
@@ -116,7 +116,13 @@ class AESCipher(object):
         enc = base64.b64decode(enc)
         iv = enc[:AES.block_size]
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        return self._unpad(cipher.decrypt(enc[AES.block_size:])).decode('utf-8')
+        plain = self._unpad(cipher.decrypt(enc[AES.block_size:]))
+        try:
+            # 如果是字节流, 比如图片, 无法解码成 utf-8 编码的字符串
+            return plain.decode('utf-8')
+        except Exception as e:
+            logger.warning(e)
+            return plain
 
     def _pad(self, s):
         return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
@@ -124,67 +130,6 @@ class AESCipher(object):
     @staticmethod
     def _unpad(s):
         return s[:-ord(s[len(s) - 1:])]
-
-
-class AESHelper(object):
-    """
-    AES 加密助手
-    """
-
-    @staticmethod
-    def pad(s):
-        """
-        对明文进行填充
-        :param s:
-        :return:
-        """
-        bs = AES.block_size
-        return s + (bs - len(s) % bs) * chr(bs - len(s) % bs)
-
-    @staticmethod
-    def unpad(s):
-        """
-        去除明文的填充
-        :param s:
-        :return:
-        """
-        return s[0:-ord(s[-1])]
-
-    @staticmethod
-    def encrypt(key, message):
-        """
-        """
-        message = bytes(message)
-        # IV 使用 key 的前16个字节
-        encryption_suite = AES.new(key, AES.MODE_CBC, key[:16])
-        message = AESHelper.pad(message)
-        cipher_text = encryption_suite.encrypt(message)
-        return b64encode(cipher_text)
-
-    @staticmethod
-    def decrypt(key, b64_cipher_text):
-        cipher_text = b64decode(b64_cipher_text)
-        decryption_suite = AES.new(key, AES.MODE_CBC, key[:16])
-        plain_text = decryption_suite.decrypt(cipher_text)
-        return AESHelper.unpad(plain_text)
-
-    @staticmethod
-    def encrypt_b64(key, message):
-        """'
-        密文使用base64编码
-        """
-        # IV 使用 key 的前16个字节
-        cryptor = AES.new(key, AES.MODE_CBC, key[:16])
-        message = AESHelper.pad(message)
-        ciphertext = cryptor.encrypt(message)
-        return b64encode(ciphertext)
-
-    @staticmethod
-    def decrypt_b64(key, b64_ciphertext):
-        ciphertext = b64decode(b64_ciphertext)
-        cryptor = AES.new(key, AES.MODE_CBC, key[:16])
-        plain_text = cryptor.decrypt(ciphertext)
-        return AESHelper.unpad(plain_text)
 
 
 class ObjectId(object):
@@ -196,8 +141,9 @@ class ObjectId(object):
         pass
 
     @classmethod
-    def get_new_object_id(cls):
+    def new_object_id(cls):
         # uuid1 由MAC地址、当前时间戳、随机数生成。可以保证全球范围内的唯一性
+        # 加上进程id, pid后, 可以保证同一台机器多进程的情况下不会出现冲突
         return '%s-%s' % (PID, uuid.uuid1())
 
 
@@ -247,7 +193,7 @@ class RedisHelper(object):
         """
         try:
             json_data = json.dumps(log_item, ensure_ascii=False)
-            key = '%s:%s' % (settings.ANALYTICS_LOG_REDIS_PREFIX, ObjectId.get_new_object_id())
+            key = '%s:%s' % (settings.ANALYTICS_LOG_REDIS_PREFIX, ObjectId.new_object_id())
             cls.get_client().setex(key, json_data, settings.ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
             logger.info('add analytics log, %s' % key)
         except Exception as e:
