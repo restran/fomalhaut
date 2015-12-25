@@ -11,11 +11,11 @@ from hashlib import sha256
 import re
 import random
 from urlparse import urlparse
-
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
 from utils import RedisHelper, utf8, text_type
 from middleware import BaseMiddleware
+from cerberus import Validator
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,87 @@ logger = logging.getLogger(__name__)
 
 
 class Client(object):
+    # redis 中存储的 config 数据的格式
+    config_schema = {
+        'secret_key': {
+            'type': 'string',
+            'required': True
+        },
+        'access_key': {
+            'type': 'string',
+            'required': True
+        },
+        'name': {
+            'type': 'string',
+            'required': True
+        },
+        'id': {
+            'type': 'integer',
+            'required': True
+        },
+        'enable': {
+            'type': 'boolean',
+            'required': True
+        },
+        'endpoints': {
+            'type': 'dict',
+            'required': True,
+            # 字典的 key
+            'propertyschema': {
+                'type': 'string'
+            },
+            # 字典的 value
+            'valueschema': {
+                'type': 'dict',
+                'allow_unknown': True,
+                'schema': {
+                    'name': {
+                        'type': 'string',
+                        'required': True
+                    },
+                    'id': {
+                        'type': 'integer',
+                        'required': True
+                    },
+                    'enable': {
+                        'type': 'boolean',
+                        'required': True
+                    },
+                    'uri_prefix': {
+                        'type': 'string',
+                        'required': True
+                    },
+                    'url': {
+                        'type': 'string',
+                        'required': True
+                    },
+                    'netloc': {
+                        'type': 'string',
+                        'required': True
+                    },
+                    'enable_acl': {
+                        'type': 'boolean',
+                        'required': True
+                    },
+                    'acl_rules': {
+                        'type': 'list',
+                        'required': True,
+                        'items': {
+                            're_uri': {
+                                'type': 'string',
+                                'required': True,
+                            },
+                            'is_permit': {
+                                'type': 'boolean',
+                                'required': True,
+                            }
+                        }
+                    },
+                }
+            }
+        },
+    }
+
     def __init__(self, request):
         self.access_key = request.headers.get('X-Api-Access-Key')
         self.secret_key = None
@@ -38,6 +119,13 @@ class Client(object):
         config_data = RedisHelper.get_client_config(self.access_key)
         if config_data is None:
             raise ClientBadConfigException('no client config')
+        else:
+            # 校验 config 数据是否正确
+            v = Validator()
+            v.allow_unknown = True
+            if not v.validate(config_data, self.config_schema):
+                logger.error(v.errors)
+                raise ClientBadConfigException('bad client config')
 
         logger.debug(config_data)
 
@@ -154,7 +242,7 @@ class HMACAuthHandler(object):
             raise AuthRequestException('Invalid Signature')
 
 
-class PrepareRequestHandler(BaseMiddleware):
+class PrepareProxyHandler(BaseMiddleware):
     """
     对访问请求进行鉴权
     """

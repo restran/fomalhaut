@@ -50,7 +50,8 @@ class Application(web.Application):
             mw_class = import_string(middleware_path)
             self.middleware_list.append(mw_class)
 
-        logger.debug(self.middleware_list)
+        logger.debug('middleware_list: \n%s' %
+                     '\n'.join([text_type(m) for m in self.middleware_list]))
 
 
 app = Application()

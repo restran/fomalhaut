@@ -118,7 +118,7 @@ class AESCipher(object):
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
         plain = self._unpad(cipher.decrypt(enc[AES.block_size:]))
         try:
-            # 如果是字节流, 比如图片, 无法解码成 utf-8 编码的字符串
+            # 如果是字节流, 比如图片, 无法用 utf-8 编码解码成 unicode 的字符串
             return plain.decode('utf-8')
         except Exception as e:
             logger.warning(e)

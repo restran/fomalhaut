@@ -1,6 +1,7 @@
+cerberus>=0.9
 requests
 six
-tornado
+tornado>=4.0
 redis
 pycrypto
 ConcurrentLogHandler

@@ -24,7 +24,7 @@ MIDDLEWARE_CLASSES = [
     'middleware.analytics.AnalyticsHandler',
     'middleware.auth.AuthenticateHandler',
     'middleware.encrypt.EncryptHandler',
-    'middleware.auth.PrepareRequestHandler',
+    'middleware.auth.PrepareProxyHandler',
 ]
 
 

@@ -94,7 +94,7 @@ class ClientAuthRequest(object):
                 logger.debug('解密 body')
                 logger.debug(body.encode('hex'))
                 body = aes_cipher.decrypt(utf8(body))
-                logger.debug(body.encode('hex'))
+                # logger.debug(body.decode('hex'))
         except Exception as e:
             logger.error('解密数据出错')
             logger.error(e)
@@ -163,7 +163,7 @@ class ClientAuthRequest(object):
 
         logger.debug(url)
         logger.debug(self.request_data.headers)
-        logger.debug(self.request_data.body)
+        # logger.debug(self.request_data.body)
 
         if r.status_code != AUTH_FAIL_STATUS_CODE:
             is_valid = self.check_response(r)
