@@ -79,7 +79,7 @@ class BaseHandler(RequestHandler):
         self.clear()
 
         try:
-            if status_code == AUTH_FAIL_STATUS_CODE:
+            if status_code == GATEWAY_ERROR_STATUS_CODE:
                 self.set_status(status_code, 'Invalid Request')
             else:
                 self.set_status(status_code)
@@ -136,7 +136,7 @@ class BaseHandler(RequestHandler):
                         self.clear_nested_middleware(mv_class)
                         # 如果在 request 阶段就出现了异常,直接进入 finish
                         if mv_type == _REQUEST and not self._finished:
-                            status_code = getattr(e, 'status_code', AUTH_FAIL_STATUS_CODE)
+                            status_code = getattr(e, 'status_code', GATEWAY_ERROR_STATUS_CODE)
                             logger.debug('exception write error')
                             self.write_error(status_code, exc_info=sys.exc_info())
                         # 不再往下执行
@@ -146,7 +146,7 @@ class BaseHandler(RequestHandler):
             logger.error(traceback.format_exc())
             # 出现了预料之外的错误, 清理所有中间件, 结束
             self.middleware_list = []
-            status_code = getattr(e, 'status_code', AUTH_FAIL_STATUS_CODE)
+            status_code = getattr(e, 'status_code', GATEWAY_ERROR_STATUS_CODE)
             self.write_error(status_code, exc_info=sys.exc_info())
 
     @gen.coroutine

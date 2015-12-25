@@ -27,9 +27,9 @@ MIDDLEWARE_CLASSES = [
     'middleware.auth.PrepareProxyHandler',
 ]
 
-
-# 未通过网关鉴权时返回的状态码
-AUTH_FAIL_STATUS_CODE = 603
+# 未通过网关鉴权, 或者未能正确请求时返回的状态码
+# 通过特殊的状态码, 区分后端 API Server 返回的状态码
+GATEWAY_ERROR_STATUS_CODE = 600
 
 # 可以给日志对象设置日志级别，低于该级别的日志消息将会被忽略
 # CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET

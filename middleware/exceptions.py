@@ -5,7 +5,7 @@
 from __future__ import unicode_literals
 
 import logging
-from settings import AUTH_FAIL_STATUS_CODE
+from settings import GATEWAY_ERROR_STATUS_CODE
 from tornado.web import HTTPError
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class ClientErrorException(HTTPError):
 
     def __init__(self, log_message, *args, **kwargs):
         super(ClientErrorException, self).__init__(
-            AUTH_FAIL_STATUS_CODE, log_message, *args, **kwargs)
+            GATEWAY_ERROR_STATUS_CODE, log_message, *args, **kwargs)
 
 
 class ServerErrorException(HTTPError):
@@ -28,24 +28,16 @@ class ServerErrorException(HTTPError):
 
     def __init__(self, log_message, *args, **kwargs):
         super(ServerErrorException, self).__init__(
-            AUTH_FAIL_STATUS_CODE, log_message, *args, **kwargs)
+            GATEWAY_ERROR_STATUS_CODE, log_message, *args, **kwargs)
 
 
 class ClientBadConfigException(ServerErrorException):
     """
-    Client 配置信息有误,或者不存在
+    Client 配置信息有误, 或者不存在
     """
-
-    def __init__(self, log_message, *args, **kwargs):
-        super(ClientBadConfigException, self).__init__(
-            AUTH_FAIL_STATUS_CODE, log_message, *args, **kwargs)
 
 
 class AuthRequestException(ClientErrorException):
     """
-    非法请求,签名错误,时间戳过期
+    非法请求, 签名错误, 时间戳过期
     """
-
-    def __init__(self, log_message, *args, **kwargs):
-        super(AuthRequestException, self).__init__(
-            AUTH_FAIL_STATUS_CODE, log_message, *args, **kwargs)

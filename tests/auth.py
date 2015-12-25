@@ -9,7 +9,7 @@ import time
 import hmac
 from hashlib import sha256
 from urlparse import urlparse, urlunparse
-from settings import PORT as API_SERVER_PORT, AUTH_FAIL_STATUS_CODE
+from settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
 import requests
 
 from utils import *
@@ -126,7 +126,7 @@ class ClientAuthRequest(object):
 
         r = requests.get(url, headers=self.request_data.headers)
         logger.debug(r.status_code)
-        if r.status_code != AUTH_FAIL_STATUS_CODE:
+        if r.status_code != GATEWAY_ERROR_STATUS_CODE:
             is_valid = self.check_response(r)
             if not is_valid:
                 logger.debug('返回结果签名不正确')
@@ -165,7 +165,7 @@ class ClientAuthRequest(object):
         logger.debug(self.request_data.headers)
         # logger.debug(self.request_data.body)
 
-        if r.status_code != AUTH_FAIL_STATUS_CODE:
+        if r.status_code != GATEWAY_ERROR_STATUS_CODE:
             is_valid = self.check_response(r)
             if not is_valid:
                 logger.debug('返回结果签名不正确')
@@ -341,12 +341,12 @@ class APIAuthTest(unittest.TestCase):
         req = ClientAuthRequest(self.access_key, 'bad secret key',
                                 self.api_server, self.endpoint, self.uri_prefix)
         r = req.get('/resource/')
-        self.assertEqual(r.status_code, AUTH_FAIL_STATUS_CODE)
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
         req = ClientAuthRequest('bad access key', 'bad secret key',
                                 self.api_server, self.endpoint, self.uri_prefix)
         r = req.get('/resource/')
-        self.assertEqual(r.status_code, AUTH_FAIL_STATUS_CODE)
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
     def test_acl(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
@@ -357,7 +357,7 @@ class APIAuthTest(unittest.TestCase):
         req = ClientAuthRequest(self.access_key, self.secret_key,
                                 self.api_server, self.endpoint, self.uri_prefix)
         r = req.get('/forbidden/')
-        self.assertEqual(r.status_code, AUTH_FAIL_STATUS_CODE)
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
     def test_post_json(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
