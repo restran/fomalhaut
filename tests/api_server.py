@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__file__)
 
 define('host', default='127.0.0.1', help='run on the given host', type=str)
-define('port', default=8000, help='run on the given port', type=int)
+define('port', default=8001, help='run on the given port', type=int)
 
 
 class APIHandler(tornado.web.RequestHandler):

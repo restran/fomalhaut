@@ -77,6 +77,8 @@ class BaseHandler(RequestHandler):
                 hasattr(e, 'log_message') else text_type(e)
 
         self.clear()
+        # 因为执行了 clear，把之前设置的 header 也清理掉了，需要重新设置
+        self.set_header("Content-Type", "application/json; charset=utf-8")
 
         try:
             if status_code == GATEWAY_ERROR_STATUS_CODE:

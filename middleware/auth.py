@@ -43,10 +43,6 @@ class Client(object):
             'type': 'integer',
             'required': True
         },
-        'enable': {
-            'type': 'boolean',
-            'required': True
-        },
         'endpoints': {
             'type': 'dict',
             'required': True,
@@ -67,11 +63,7 @@ class Client(object):
                         'type': 'integer',
                         'required': True
                     },
-                    'enable': {
-                        'type': 'boolean',
-                        'required': True
-                    },
-                    'uri_prefix': {
+                    'version': {
                         'type': 'string',
                         'required': True
                     },
@@ -90,6 +82,7 @@ class Client(object):
                     'acl_rules': {
                         'type': 'list',
                         'required': True,
+                        'allow_unknown': True,
                         'items': {
                             're_uri': {
                                 'type': 'string',
@@ -118,16 +111,17 @@ class Client(object):
     def get_client_config(self):
         config_data = RedisHelper.get_client_config(self.access_key)
         if config_data is None:
-            raise ClientBadConfigException('no client config')
+            raise ClientBadConfigException('No Client Config')
         else:
             # 校验 config 数据是否正确
-            v = Validator()
-            v.allow_unknown = True
-            if not v.validate(config_data, self.config_schema):
+            v = Validator(self.config_schema, allow_unknown=True)
+            if not v.validate(config_data):
                 logger.error(v.errors)
-                raise ClientBadConfigException('bad client config')
+                raise ClientBadConfigException('Bad Client Config')
 
         logger.debug(config_data)
+        if not config_data.get('enable', True):
+            raise AuthRequestException('Disabled Client')
 
         self.secret_key = config_data.get('secret_key')
         self.config = config_data
@@ -229,8 +223,8 @@ class HMACAuthHandler(object):
         if signature:
             del request.headers['X-Api-Signature']
         else:
-            logger.debug('No signature provide')
-            raise AuthRequestException('No Signature Provide')
+            logger.debug('No Signature Provided')
+            raise AuthRequestException('No Signature Provided')
 
         string_to_sign = self._request_string_to_sign(request)
         # 如果不是 unicode 输出会引发异常
@@ -250,25 +244,29 @@ class PrepareProxyHandler(BaseMiddleware):
     def _parse_uri(self, client):
         """
         解析请求的 uri
+        :type client: Client
         :return:
         """
         try:
-            _, req_endpoint, uri = self.handler.request.uri.split('/', 2)
+            _, req_endpoint, version, uri = self.handler.request.uri.split('/', 3)
         except ValueError:
-            raise AuthRequestException('Invalid Request Uri')
+            raise AuthRequestException('Invalid Request Uri, Fail to Get Endpoint and Version')
 
         endpoints = client.config.get('endpoints', {})
-        endpoint = endpoints.get(req_endpoint)
+        endpoint = endpoints.get('%s:%s' % (req_endpoint, version))
         if endpoint is None:
             raise AuthRequestException('No Permission to Access %s' % req_endpoint)
 
-        uri_prefix = endpoint.get('uri_prefix')
-        if uri_prefix and uri_prefix != '':
-            try:
-                # 处理 uri 前缀
-                _, uri = uri.split(uri_prefix, 1)
-            except ValueError:
-                raise AuthRequestException('Invalid Request Uri Prefix')
+        if not endpoint.get('enable', True):
+            raise AuthRequestException('Disabled Endpoint')
+
+        # version = endpoint.get('version')
+        # if version and version != '':
+        #     try:
+        #         # 处理 uri 前的版本号
+        #         _, uri = uri.split(version, 1)
+        #     except ValueError:
+        #         raise AuthRequestException('Invalid Request API Version')
 
         if not uri.startswith('/'):
             uri = '/' + uri

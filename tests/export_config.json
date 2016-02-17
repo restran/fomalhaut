@@ -1,0 +1,48 @@
+{
+    "client_endpoints": [
+        {
+            "client_id": 3, 
+            "enable": true, 
+            "endpoint_id": 2, 
+            "id": 18
+        }
+    ], 
+    "clients": [
+        {
+            "access_key": "abcd", 
+            "enable": true, 
+            "id": 3, 
+            "memo": "", 
+            "name": "test_client", 
+            "secret_key": "1234"
+        }
+    ], 
+    "endpoints": [
+        {
+            "acl_rules": [
+                {
+                    "endpoint_id": 2, 
+                    "id": 10, 
+                    "is_permit": false, 
+                    "re_uri": "^/forbidden.*"
+                }, 
+                {
+                    "endpoint_id": 2, 
+                    "id": 11, 
+                    "is_permit": true, 
+                    "re_uri": "^/resource"
+                }
+            ], 
+            "async_http_connect_timeout": 20, 
+            "async_http_request_timeout": 20, 
+            "enable_acl": true, 
+            "id": 2, 
+            "memo": "", 
+            "name": "test_api", 
+            "netloc": "127.0.0.1:8001", 
+            "unique_name": "测试API", 
+            "url": "http://127.0.0.1:8001", 
+            "version": "v1"
+        }
+    ]
+}

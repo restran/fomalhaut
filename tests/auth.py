@@ -32,12 +32,12 @@ class ClientAuthRequest(object):
     # TODO 重新整理代码, 将签名和加解密部分分离出来
 
     def __init__(self, access_key, secret_key, api_server,
-                 endpoint, uri_prefix='', encrypt_type='raw'):
+                 endpoint, version='', encrypt_type='raw'):
         self.access_key = access_key
         self.secret_key = secret_key
         self.api_server = api_server
         self.endpoint = endpoint
-        self.uri_prefix = uri_prefix
+        self.version = version
         self.encrypt_type = encrypt_type
         self.request_data = RequestObject()
 
@@ -61,7 +61,7 @@ class ClientAuthRequest(object):
 
     def get_real_url(self, uri):
         url = '/'.join([self.api_server.strip(), self.endpoint.strip().strip('/'),
-                        self.uri_prefix.strip().strip('/')]) + uri.strip()
+                        self.version.strip().strip('/')]) + uri.strip()
         return url
 
     def encrypt_data(self):
@@ -288,50 +288,17 @@ class ClientAuthRequest(object):
 
 
 class APIAuthTest(unittest.TestCase):
-    """
-    redis 中需要先设置 client 的配置信息
-    key: config:abcd
-    value:
-    {
-        "secret_key": "1234",
-        "access_key": "abcd",
-        "name": "test_client",
-        "id": 123,
-        "enable": true,
-        "endpoints": {
-            "test": {
-                "name": "test",
-                "id": 101,
-                "enable": true,
-                "enable_acl": true,
-                "uri_prefix": "aaa",
-                "url": "http://127.0.0.1:8000",
-                "netloc": "127.0.0.1:8000",
-                "acl_rules": [
-                    {
-                        "re_uri": "^/forbidden.*",
-                        "is_permit": false
-                    },
-                    {
-                        "re_uri": "^/resource",
-                        "is_permit": true
-                    }
-                ]
-            }
-        }
-    }
-    """
 
     def setUp(self):
         self.access_key = 'abcd'
         self.secret_key = '1234'
         self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
-        self.endpoint = 'test'
-        self.uri_prefix = 'aaa'
+        self.endpoint = 'test_api'
+        self.version = 'v1'
 
     def test_auth(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
         r = req.get('/resource')
         self.assertEqual(r.status_code, 200)
         r = req.get('/resource/not_exist')
@@ -339,29 +306,29 @@ class APIAuthTest(unittest.TestCase):
 
     def test_signature(self):
         req = ClientAuthRequest(self.access_key, 'bad secret key',
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
         r = req.get('/resource/')
         self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
         req = ClientAuthRequest('bad access key', 'bad secret key',
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
         r = req.get('/resource/')
         self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
     def test_acl(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
         r = req.get('/resource')
         self.assertEqual(r.status_code, 200)
 
         req = ClientAuthRequest(self.access_key, self.secret_key,
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
         r = req.get('/forbidden/')
         self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
     def test_post_json(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
         json_data = {
             'a': 1,
             'b': 'test string',
@@ -376,7 +343,7 @@ class APIAuthTest(unittest.TestCase):
 
     def test_post_img(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
-                                self.api_server, self.endpoint, self.uri_prefix)
+                                self.api_server, self.endpoint, self.version)
 
         with open('img.jpg', 'rb') as f:
             body = f.read()
@@ -391,13 +358,13 @@ class AESTest(unittest.TestCase):
         self.access_key = 'abcd'
         self.secret_key = '1234'
         self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
-        self.endpoint = 'test'
-        self.uri_prefix = 'aaa'
+        self.endpoint = 'test_api'
+        self.version = 'v1'
 
     def test_aes_post(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
                                 self.api_server, self.endpoint,
-                                self.uri_prefix, encrypt_type='aes')
+                                self.version, encrypt_type='aes')
         json_data = {
             'a': 1,
             'b': 'test string',
@@ -413,7 +380,7 @@ class AESTest(unittest.TestCase):
     def test_aes_post_img(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
                                 self.api_server, self.endpoint,
-                                self.uri_prefix, encrypt_type='aes')
+                                self.version, encrypt_type='aes')
 
         with open('img.jpg', 'rb') as f:
             body = f.read()
@@ -425,7 +392,7 @@ class AESTest(unittest.TestCase):
     def test_aes_get(self):
         req = ClientAuthRequest(self.access_key, self.secret_key,
                                 self.api_server, self.endpoint,
-                                self.uri_prefix, encrypt_type='aes')
+                                self.version, encrypt_type='aes')
         r = req.get('/resource/')
 
         self.assertEqual(r.status_code, 200)
