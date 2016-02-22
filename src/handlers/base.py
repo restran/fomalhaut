@@ -104,6 +104,8 @@ class BaseHandler(RequestHandler):
 
             self.write('%s %s' % (status_code, get_exc_message(ex)))
         else:
+            logger.error(get_exc_message(ex))
+            logger.error(traceback.format_exc())
             self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
             self.write('500 Internal Error')
 

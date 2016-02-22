@@ -16,7 +16,7 @@ from tornado import web
 
 from utils import RedisHelper, import_string
 from utils import text_type, binary_type
-from handlers.proxy import ProxyHandler
+from handlers.proxy import BackendAPIHandler
 import settings
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,27 @@ class Application(web.Application):
 
         self.middleware_list = []
         self.load_middleware()
+        handlers = self.load_builtin_endpoints()
+        handlers.extend(
+            [(r'/.*', BackendAPIHandler)]
+        )
 
-        handlers = [(r'/.*', ProxyHandler)]
         web.Application.__init__(self, handlers, **tornado_settings)
+
+    def load_builtin_endpoints(self):
+        """
+        从 settings.BUILTIN_ENDPOINTS 载入内置的 endpoints
+        """
+        handlers = []
+        for endpoint in settings.BUILTIN_ENDPOINTS:
+            c = endpoint['config']
+            for url, handler_path in endpoint['handlers']:
+                h_class = import_string(handler_path)
+                handlers.append((r'/%s/%s%s' % (c['name'], c['version'], url), h_class))
+
+        logger.debug('builtin_endpoints: \n%s' %
+                     '\n'.join([text_type(h) for h in handlers]))
+        return handlers
 
     def load_middleware(self):
         """
@@ -71,7 +89,7 @@ def main():
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
     http_server.listen(options.port, options.host)
 
-    logger.info('tornado server is running on %s:%s' % (options.host, options.port))
+    logger.info('api gateway server is running on %s:%s' % (options.host, options.port))
     tornado.ioloop.IOLoop.instance().start()
 
 

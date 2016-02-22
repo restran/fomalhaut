@@ -35,13 +35,13 @@ class ResultCode(object):
 class AnalyticsData(object):
     remote_ip = ''
     request_uri = ''
-
+    builtin_endpoint = False
     client_id = None
     client_name = ''
     # 请求的 api 名称
     endpoint_name = ''
     endpoint_id = None
-    uri_prefix = ''
+    version = ''
     forward_url = ''
     method = ''
     # 访问时间戳,精确到毫秒
@@ -62,7 +62,8 @@ class AnalyticsData(object):
             'client_name': self.client_name,
             'endpoint_name': self.endpoint_name,
             'endpoint_id': self.endpoint_id,
-            'uri_prefix': self.uri_prefix,
+            'builtin_endpoint': self.builtin_endpoint,
+            'version': self.version,
             'forward_url': self.forward_url,
             'method': self.method,
             'timestamp': self.timestamp,
@@ -110,7 +111,8 @@ class AnalyticsHandler(BaseMiddleware):
             endpoint = client.request.get('endpoint', {})
             analytics.endpoint_name = endpoint.get('name')
             analytics.endpoint_id = endpoint.get('id')
-            analytics.uri_prefix = endpoint.get('uri_prefix')
+            analytics.version = endpoint.get('version')
+            analytics.builtin_endpoint = endpoint.get('builtin_endpoint', False)
             analytics.forward_url = client.request.get('forward_url')
 
         # 将统计数据暂时存储在 redis 中

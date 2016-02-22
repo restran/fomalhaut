@@ -26,7 +26,7 @@ from handlers.base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class ProxyHandler(BaseHandler):
+class BackendAPIHandler(BaseHandler):
     """
     处理代理请求
     """
@@ -54,12 +54,13 @@ class ProxyHandler(BaseHandler):
         # 会出现 422 错误
         for name, value in headers.iteritems():
             # 过滤 x-api 开头的,这些只是发给 api-gateway
-            if name.lower().startswith('x-api'):
+            l_name = name.lower()
+            if l_name.startswith('x-api-') and l_name != 'x-api-user-json':
                 pass
             # 不需要提供 Content-Length, 自动计算
             # 如果 Content-Length 不正确, 请求后端网站会出错,
             # 太大会出现超时问题, 太小会出现内容被截断
-            elif name == 'Content-Length':
+            elif l_name == 'content-length':
                 pass
             else:
                 new_headers[text_type(name)] = text_type(value)
@@ -98,7 +99,7 @@ class ProxyHandler(BaseHandler):
                             decompress_response=True,
                             connect_timeout=async_http_connect_timeout,
                             request_timeout=async_http_request_timeout,
-                            follow_redirects=True))
+                            follow_redirects=False))
             self._on_proxy(response)
         except tornado.httpclient.HTTPError as x:
             if hasattr(x, 'response') and x.response:

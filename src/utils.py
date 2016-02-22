@@ -15,7 +15,7 @@ import types
 from copy import copy
 import base64
 import hashlib
-
+import random
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
@@ -102,6 +102,7 @@ class AESCipher(object):
     """
     http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
     """
+
     def __init__(self, key):
         self.bs = 32
         self.key = hashlib.sha256(key.encode()).digest()
@@ -144,7 +145,24 @@ class ObjectId(object):
     def new_object_id(cls):
         # uuid1 由MAC地址、当前时间戳、随机数生成。可以保证全球范围内的唯一性
         # 加上进程id, pid后, 可以保证同一台机器多进程的情况下不会出现冲突
-        return '%s-%s' % (PID, uuid.uuid1())
+        return '%s-%s' % (PID, text_type(uuid.uuid1()).replace('-', ''))
+
+
+def new_random_token():
+    to_hash = ObjectId.new_object_id() + text_type(random.random())
+    token = hashlib.sha1(to_hash).hexdigest()
+    logger.debug(token)
+    return token
+
+
+def json_loads(data):
+    try:
+        return json.loads(data) if data else None
+    except Exception as e:
+        logger.error(e.message)
+        logger.error(traceback.format_exc())
+
+    return None
 
 
 class RedisHelper(object):
@@ -167,23 +185,118 @@ class RedisHelper(object):
     @classmethod
     def get_client_config(cls, access_key):
         """
-        获取代理配置，这里app_config即access_agent，但是不包含backend_sites
-        如果有用到需要另外获取
+        获取 client 配置
         :param access_key:
         :return:
         """
         config_data = cls.get_client().get(
-            '%s:%s' % (settings.PROXY_CONFIG_REDIS_PREFIX, access_key))
+            '%s:%s' % (settings.CLIENT_CONFIG_REDIS_PREFIX, access_key))
 
         logger.debug(config_data)
         # 数据全部是存json
+        return json_loads(config_data)
+
+    @classmethod
+    def get_token_info(cls, access_token):
+        """
+        获取 client 配置
+        :param access_token:
+        :return:
+        """
+        token_info = cls.get_client().get(
+            '%s:%s' % (settings.CLIENT_CONFIG_REDIS_PREFIX, access_token))
+
+        logger.debug(token_info)
+        # 数据全部是存 json
+        return json_loads(token_info)
+
+    @classmethod
+    def get_access_token_info(cls, access_token):
+        """
+        获取 client 配置
+        :param access_token:
+        :return:
+        """
+        token_info = cls.get_client().get(
+            '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, access_token))
+
+        logger.debug(token_info)
+        # 数据全部是存 json
+        return json_loads(token_info)
+
+    @classmethod
+    def get_refresh_token_info(cls, refresh_token):
+        """
+        获取 client 配置
+        :param refresh_token:
+        :return:
+        """
+        token_info = cls.get_client().get(
+            '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, refresh_token))
+
+        logger.debug(token_info)
+        # 数据全部是存 json
+        return json_loads(token_info)
+
+    @classmethod
+    def clear_token_info(cls, access_token=None, refresh_token=None):
+        if access_token:
+            token_info = cls.get_access_token_info(access_token)
+        elif refresh_token:
+            token_info = cls.get_access_token_info(refresh_token)
+        else:
+            return
+
+        if token_info:
+            k_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
+            k_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
+            cls.get_client().delete([k_a, k_r])
+
+    @classmethod
+    def set_token_info(cls, token_info, access_token_ex, refresh_token_ex):
+        """
+        插入 access_token 和 refresh_token 到 redis 中
+        :return:
+        """
+        count = 3
+        can_set_a = False
+        while count > 0:
+            access_token = new_random_token()
+            k_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, access_token)
+            v = cls.get_client().get(k_a)
+            if v is None:
+                token_info['access_token'] = access_token
+                can_set_a = True
+                break
+
+        count = 3
+        can_set_r = False
+        while count > 0:
+            count -= 1
+            refresh_token = new_random_token()
+            k_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, refresh_token)
+            v = cls.get_client().get(k_r)
+            if v is None:
+                token_info['refresh_token'] = refresh_token
+                can_set_r = True
+                break
+
+        if not can_set_a or not can_set_r:
+            return None
+
         try:
-            return json.loads(config_data) if config_data else None
+            json_data = json.dumps(token_info, ensure_ascii=False)
+            key = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
+            cls.get_client().setex(key, json_data, access_token_ex)
+            json_data = json.dumps(token_info, ensure_ascii=False)
+            key = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
+            cls.get_client().setex(key, json_data, refresh_token_ex)
         except Exception as e:
             logger.error(e.message)
             logger.error(traceback.format_exc())
+            return None
 
-        return None
+        return token_info
 
     @classmethod
     def add_analytics_log(cls, log_item):

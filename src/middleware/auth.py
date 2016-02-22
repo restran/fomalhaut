@@ -3,6 +3,8 @@
 # created by restran on 2015/12/19
 
 from __future__ import unicode_literals, absolute_import
+import base64
+import json
 
 import time
 import logging
@@ -10,6 +12,7 @@ import hmac
 from hashlib import sha256
 import re
 import random
+import traceback
 from urlparse import urlparse
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
@@ -124,6 +127,12 @@ class Client(object):
             raise AuthRequestException('Disabled Client')
 
         self.secret_key = config_data.get('secret_key')
+        # 添加内置的 endpoint
+        for t in settings.BUILTIN_ENDPOINTS:
+            endpoint = t['config']
+            k = '%s:%s' % (endpoint['name'], endpoint['version'])
+            config_data['endpoints'][k] = endpoint
+
         self.config = config_data
 
 
@@ -144,7 +153,7 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = {'Host': request.headers.get('Host')}
         for name, value in request.headers.items():
-            if name.lower().startswith('x-api'):
+            if name.lower().startswith('x-api-'):
                 headers_to_sign[name] = value
         return headers_to_sign
 
@@ -155,7 +164,7 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = {}
         for name, value in response_headers.items():
-            if name.lower().startswith('x-api'):
+            if name.lower().startswith('x-api-'):
                 headers_to_sign[name] = value
         return headers_to_sign
 
@@ -236,9 +245,45 @@ class HMACAuthHandler(object):
             raise AuthRequestException('Invalid Signature')
 
 
-class PrepareProxyHandler(BaseMiddleware):
+class AuthenticateHandler(BaseMiddleware):
     """
     对访问请求进行鉴权
+    """
+
+    def process_request(self, *args, **kwargs):
+        logger.debug('process_request')
+        self.handler.client = Client(self.handler.request)
+        auth_handler = HMACAuthHandler(self.handler.client)
+        # logger.debug(self.handler.request.uri)
+        # logger.debug(dict(self.handler.request.headers))
+        # logger.debug(self.handler.request.body)
+        auth_handler.auth_request(self.handler.request)
+
+    def process_response(self, *args, **kwargs):
+        logger.debug('process_response')
+        auth_handler = HMACAuthHandler(self.handler.client)
+        headers = {
+            'X-Api-Timestamp': text_type(int(time.time())),
+            'X-Api-Nonce': text_type(random.random()),
+        }
+        for k, v in headers.iteritems():
+            self.handler.set_header(k, v)
+
+        response_body = b''.join(self.handler.get_write_buffer())
+        # logger.debug(response_body.decode('utf-8'))
+        # logger.debug(dict(self.handler.get_response_headers()))
+        signature = auth_handler.signature_response(
+            self.handler.get_response_headers(),
+            self.handler.request, response_body)
+
+        # 对返回结果进行签名
+        self.handler.set_header('X-Api-Signature', signature)
+        logger.debug('process_response_done')
+
+
+class ParseEndpointHandler(BaseMiddleware):
+    """
+    解析出需要访问的 Endpoint
     """
 
     def _parse_uri(self, client):
@@ -271,20 +316,24 @@ class PrepareProxyHandler(BaseMiddleware):
         if not uri.startswith('/'):
             uri = '/' + uri
 
-        # 解析要转发的地址
-        endpoint_url = endpoint.get('url')
-        if endpoint_url is None:
-            raise AuthRequestException('No Endpoint Url Config')
-
-        endpoint_netloc = endpoint.get('netloc')
-        if endpoint_netloc is None:
-            url_parsed = urlparse(endpoint_url)
-            endpoint['netloc'] = url_parsed.netloc
-
-        if endpoint_url.endswith('/'):
-            forward_url = endpoint_url + uri[1:]
+        if endpoint.get('builtin_endpoint', False):
+            # 如果是内置的 endpoint, 就没有 forward_url
+            forward_url = None
         else:
-            forward_url = endpoint_url + uri
+            # 解析要转发的地址
+            endpoint_url = endpoint.get('url')
+            if endpoint_url is None:
+                raise AuthRequestException('No Endpoint Url Config')
+
+            endpoint_netloc = endpoint.get('netloc')
+            if endpoint_netloc is None:
+                url_parsed = urlparse(endpoint_url)
+                endpoint['netloc'] = url_parsed.netloc
+
+            if endpoint_url.endswith('/'):
+                forward_url = endpoint_url + uri[1:]
+            else:
+                forward_url = endpoint_url + uri
 
         request_data = {
             'endpoint': endpoint,
@@ -293,7 +342,6 @@ class PrepareProxyHandler(BaseMiddleware):
         }
 
         logger.debug(request_data)
-
         return request_data
 
     def _acl_filter(self):
@@ -329,39 +377,3 @@ class PrepareProxyHandler(BaseMiddleware):
         self.handler.client.request = self._parse_uri(self.handler.client)
         # 进行 acl 过滤
         self._acl_filter()
-
-
-class AuthenticateHandler(BaseMiddleware):
-    """
-    对访问请求进行鉴权
-    """
-
-    def process_request(self, *args, **kwargs):
-        logger.debug('process_request')
-        self.handler.client = Client(self.handler.request)
-        auth_handler = HMACAuthHandler(self.handler.client)
-        # logger.debug(self.handler.request.uri)
-        # logger.debug(dict(self.handler.request.headers))
-        # logger.debug(self.handler.request.body)
-        auth_handler.auth_request(self.handler.request)
-
-    def process_response(self, *args, **kwargs):
-        logger.debug('process_response')
-        auth_handler = HMACAuthHandler(self.handler.client)
-        headers = {
-            'X-Api-Timestamp': text_type(int(time.time())),
-            'X-Api-Nonce': text_type(random.random()),
-        }
-        for k, v in headers.iteritems():
-            self.handler.set_header(k, v)
-
-        response_body = b''.join(self.handler.get_write_buffer())
-        # logger.debug(response_body.decode('utf-8'))
-        # logger.debug(dict(self.handler.get_response_headers()))
-        signature = auth_handler.signature_response(
-            self.handler.get_response_headers(),
-            self.handler.request, response_body)
-
-        # 对返回结果进行签名
-        self.handler.set_header('X-Api-Signature', signature)
-        logger.debug('process_response_done')

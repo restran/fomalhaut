@@ -24,7 +24,24 @@ MIDDLEWARE_CLASSES = [
     'middleware.analytics.AnalyticsHandler',
     'middleware.auth.AuthenticateHandler',
     'middleware.encrypt.EncryptHandler',
-    'middleware.auth.PrepareProxyHandler',
+    'middleware.auth.ParseEndpointHandler',
+    'middleware.token.AuthAccessTokenHandler',
+]
+
+# api-gateway 内置的 Endpoint
+BUILTIN_ENDPOINTS = [
+    {
+        'config': {
+            'name': 'auth',
+            'version': '1',
+            'builtin_endpoint': True
+        },
+        'handlers': [
+            ('/login/?', 'handlers.endpoint.AuthLoginHandler'),
+            ('/logout/?', 'handlers.endpoint.AuthLogoutHandler'),
+            ('/token/?', 'handlers.endpoint.AuthTokenHandler')
+        ],
+    }
 ]
 
 # 未通过网关鉴权, 或者未能正确请求时返回的状态码
@@ -48,9 +65,12 @@ REDIS_DB = 0
 REDIS_PASSWORD = '5iveSec0nds'
 REDIS_MAX_CONNECTIONS = 100
 
-# 代理配置 redis 中 key 前缀
-PROXY_CONFIG_REDIS_PREFIX = 'config'
-
+# client 配置 redis 中 key 前缀
+CLIENT_CONFIG_REDIS_PREFIX = 'config'
+# access_token redis 中 key 前缀
+ACCESS_TOKEN_REDIS_PREFIX = 't'
+# access_token redis 中 key 前缀
+REFRESH_TOKEN_REDIS_PREFIX = 'r'
 # 统计分析日志的 redis key 前缀
 ANALYTICS_LOG_REDIS_PREFIX = 'a'
 
