@@ -10,39 +10,65 @@ Redis 中存储的数据如下所示:
 ```json
 {
     "access_key": "abcd",
-    "enable": true,
+    "login_auth_url": "http://127.0.0.1:8001/login/",
+    "access_token_ex": 864000,
     "name": "test_client",
-    "memo": "",
+    "enable": true,
     "secret_key": "1234",
     "endpoints": {
         "test_api:v1": {
-            "unique_name": "测试API",
+            "unique_name": "TestAPI",
             "enable": true,
-            "memo": "",
+            "require_login": false,
             "netloc": "127.0.0.1:8001",
             "enable_acl": true,
+            "async_http_request_timeout": 20,
             "id": 2,
             "name": "test_api",
             "url": "http://127.0.0.1:8001",
             "acl_rules": [
                 {
-                    "re_uri": "^/forbidden.*",
+                    "re_uri": "^/forbidden/?",
                     "is_permit": false,
-                    "id": 10,
+                    "id": 27,
                     "endpoint_id": 2
                 },
                 {
-                    "re_uri": "^/resource",
+                    "re_uri": "^/resource/?",
                     "is_permit": true,
-                    "id": 11,
+                    "id": 28,
                     "endpoint_id": 2
                 }
             ],
             "async_http_connect_timeout": 20,
             "version": "v1",
-            "async_http_request_timeout": 20
+            "memo": ""
+        },
+        "test_api_login:v1": {
+            "unique_name": "TestAPILogin",
+            "enable": true,
+            "require_login": true,
+            "netloc": "127.0.0.1:8001",
+            "enable_acl": true,
+            "async_http_request_timeout": 20,
+            "id": 3,
+            "name": "test_api_login",
+            "url": "http://127.0.0.1:8001",
+            "acl_rules": [
+                {
+                    "re_uri": "^/login/?",
+                    "is_permit": false,
+                    "id": 29,
+                    "endpoint_id": 3
+                }
+            ],
+            "async_http_connect_timeout": 20,
+            "version": "v1",
+            "memo": ""
         }
     },
+    "memo": "",
+    "refresh_token_ex": 1728000,
     "id": 3
 }
 ```

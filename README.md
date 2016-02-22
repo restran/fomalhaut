@@ -52,4 +52,7 @@ ConcurrentLogHandler
 
 ## TODO
 
-1. 登录校验
+- [x] 登录校验, 检查 access_token
+- [x] 内置登录, 注销和更新 access_token 的 API
+- [ ] 单点登录, 在一个地方登录, 旧的 access_token 和 refresh_token 要失效
+
