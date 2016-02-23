@@ -2,15 +2,20 @@
 # created by restran on 2016/02/22
 
 from __future__ import unicode_literals
+
+import traceback
+import logging
+import json as json_util
+import random
 import time
 import hmac
 from hashlib import sha256
+from utils import utf8, encoded_dict, text_type, AESCipher, urlencode
 from urlparse import urlparse, urlunparse
-
+from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
 import requests
 
-from settings import GATEWAY_ERROR_STATUS_CODE, SIGNATURE_EXPIRE_SECONDS
-from utils import *
+logger = logging.getLogger(__name__)
 
 
 class RequestObject(object):
@@ -26,26 +31,79 @@ class RequestObject(object):
         self.host = host
 
 
-class ClientAuthRequest(object):
-    # TODO 重新整理代码, 将签名和加解密部分分离出来
-
-    def __init__(self, access_key, secret_key, api_server,
-                 endpoint, version='', encrypt_type='raw'):
+class APIClient(object):
+    def __init__(self, access_key, secret_key, api_server, *args, **kwargs):
         self.access_key = access_key
         self.secret_key = secret_key
         self.api_server = api_server
+
+        self.gateway_error_status_code = kwargs.get(
+            'gateway_error_status_code', GATEWAY_ERROR_STATUS_CODE)
+        self.signature_expire_seconds = kwargs.get(
+            'signature_expire_seconds', SIGNATURE_EXPIRE_SECONDS)
+
+
+class APIRequest(object):
+    # TODO 重新整理代码, 将签名和加解密部分分离出来
+
+    def __init__(self, client, endpoint, version='', encrypt_type='raw', *args, **kwargs):
+        self.access_key = client.access_key
+        self.secret_key = client.secret_key
+        self.api_server = client.api_server
         self.endpoint = endpoint
         self.version = version
         self.encrypt_type = encrypt_type
         self.request_data = RequestObject()
 
-    @staticmethod
-    def parse_uri(url):
-        url_parsed = urlparse(url)
-        uri = urlunparse(('', '', url_parsed.path, url_parsed.params,
-                          url_parsed.query, url_parsed.fragment))
+        self.gateway_error_status_code = client.gateway_error_status_code
+        self.signature_expire_seconds = client.signature_expire_seconds
 
-        return uri
+    def prepare_request(self, method, uri, params=None, headers=None, data=None, json=None):
+        params = {} if params is None else params
+        if not isinstance(params, dict):
+            raise TypeError('params should be dict')
+
+        method = method.upper()
+        params = encoded_dict(params)
+        logger.debug(uri)
+        url = '/'.join([self.api_server.strip(), self.endpoint.strip().strip('/'),
+                        self.version.strip().strip('/')]) + uri.strip()
+        logger.debug(url)
+        url_parsed = urlparse(url)
+        enc_params = urlencode(params)
+        logger.debug(enc_params)
+        if url_parsed.query is None or url_parsed.query == '':
+            query = enc_params
+        else:
+            query = '%s&%s' % (url_parsed.query, enc_params)
+
+        real_uri = urlunparse(('', '', url_parsed.path, url_parsed.params,
+                               query, url_parsed.fragment))
+
+        real_url = urlunparse((url_parsed.scheme, url_parsed.netloc, url_parsed.path,
+                               url_parsed.params,
+                               query, url_parsed.fragment))
+
+        self.request_data.host = url_parsed.netloc
+        self.request_data.uri = real_uri
+        self.request_data.method = method
+        self.request_data.headers = {
+            'Accept': 'application/json; charset=utf-8'
+        }
+        if headers is not None:
+            # headers 是字典
+            self.request_data.headers.update(headers)
+
+        if method == 'GET':
+            self.request_data.body = ''
+        else:
+            if json is not None:
+                self.request_data.headers['Content-Type'] = 'application/json; charset=utf-8'
+                self.request_data.body = json_util.dumps(json, ensure_ascii=False)
+            else:
+                self.request_data.body = data
+
+        return real_url
 
     def get_auth_headers(self):
         headers = {
@@ -57,17 +115,9 @@ class ClientAuthRequest(object):
 
         return headers
 
-    def get_real_url(self, uri):
-        url = '/'.join([self.api_server.strip(), self.endpoint.strip().strip('/'),
-                        self.version.strip().strip('/')]) + uri.strip()
-        return url
-
     def encrypt_data(self):
-        # if self.encrypt_type == 'raw':
-        #     raise ValueError
-
         aes_cipher = AESCipher(self.secret_key)
-        headers_str = json.dumps(self.request_data.headers)
+        headers_str = json_util.dumps(self.request_data.headers)
         # 加密 Headers 和 url
         self.request_data.headers = {
             'Content-Type': 'application/octet-stream',
@@ -101,19 +151,10 @@ class ClientAuthRequest(object):
 
         return body
 
-    def get(self, uri, headers=None):
-        url = self.get_real_url(uri)
+    def get(self, uri, params=None, headers=None, **kwargs):
+        logger.debug(uri)
+        url = self.prepare_request('GET', uri, params=params, headers=headers)
         logger.debug(url)
-        self.request_data.host = urlparse(url).netloc
-        self.request_data.uri = self.parse_uri(url)
-        self.request_data.method = 'GET'
-        if headers is None:
-            self.request_data.headers = {}
-        else:
-            # headers 是字典
-            self.request_data.headers = headers
-        self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
-        self.request_data.body = ''
 
         if self.encrypt_type == 'aes':
             url = self.encrypt_data()
@@ -122,9 +163,9 @@ class ClientAuthRequest(object):
         signature = self.signature_request()
         self.request_data.headers['X-Api-Signature'] = signature
 
-        r = requests.get(url, headers=self.request_data.headers)
+        r = requests.get(url, headers=self.request_data.headers, **kwargs)
         logger.debug(r.status_code)
-        if r.status_code != GATEWAY_ERROR_STATUS_CODE:
+        if r.status_code != self.gateway_error_status_code:
             is_valid = self.check_response(r)
             if not is_valid:
                 logger.debug('返回结果签名不正确')
@@ -135,24 +176,9 @@ class ClientAuthRequest(object):
 
         return r
 
-    def post(self, uri, data=None, json_data=None, headers=None, ):
-        url = self.get_real_url(uri)
-        logger.debug(url)
-        self.request_data.host = urlparse(url).netloc
-        self.request_data.uri = self.parse_uri(url)
-        self.request_data.method = 'POST'
-        if headers is None:
-            self.request_data.headers = {}
-        else:
-            # headers 是字典
-            self.request_data.headers = headers
-
-        self.request_data.headers['Accept'] = 'application/json; charset=utf-8'
-        if json_data is not None:
-            self.request_data.headers['Content-Type'] = 'application/json; charset=utf-8'
-            self.request_data.body = json.dumps(json_data, ensure_ascii=False)
-        else:
-            self.request_data.body = data
+    def post(self, uri, data=None, json=None, params=None, headers=None, **kwargs):
+        url = self.prepare_request('POST', uri, params=params,
+                                   data=data, json=json, headers=headers)
 
         if self.encrypt_type == 'aes':
             url = self.encrypt_data()
@@ -161,11 +187,10 @@ class ClientAuthRequest(object):
         signature = self.signature_request()
         self.request_data.headers['X-Api-Signature'] = signature
         r = requests.post(url, headers=self.request_data.headers,
-                          data=utf8(self.request_data.body))
+                          data=utf8(self.request_data.body), **kwargs)
 
         logger.debug(url)
         logger.debug(self.request_data.headers)
-        # logger.debug(self.request_data.body)
 
         if r.status_code != GATEWAY_ERROR_STATUS_CODE:
             is_valid = self.check_response(r)
@@ -259,13 +284,12 @@ class ClientAuthRequest(object):
         logger.debug(response.headers)
         try:
             timestamp = int(response.headers.get('X-Api-Timestamp'))
-        except Exception as e:
-            logger.error(e)
-            logger.error('Invalid X-Api-Timestamp Header')
+        except ValueError:
+            logger.debug('Invalid X-Api-Timestamp Header')
             return False
 
         now_ts = int(time.time())
-        if abs(timestamp - now_ts) > settings.SIGNATURE_EXPIRE_SECONDS:
+        if abs(timestamp - now_ts) > self.signature_expire_seconds:
             logger.debug('Expired signature, timestamp: %s' % timestamp)
             logger.debug('Expired Signature')
             return False
@@ -288,3 +312,29 @@ class ClientAuthRequest(object):
             return False
         else:
             return True
+
+
+if __name__ == '__main__':
+    access_key = 'abcd'
+    secret_key = '1234'
+    api_gateway = 'http://127.0.0.1:6500'
+    endpoint = 'test_api'
+    version = 'v1'
+    client = APIClient(access_key, secret_key, api_gateway)
+    request = APIRequest(client, endpoint, version)
+    params = {'a': 1, 'b': '2'}
+    r = request.get('/resource/?q=123', params=params)
+    print(r.content)
+
+    json_data = {
+        'a': 1,
+        'b': 'test string',
+        'c': '中文'
+    }
+
+    r = request.post('/resource/', json=json_data)
+    print(r.content)
+
+    request = APIRequest(client, endpoint, version, 'aes')
+    r = request.get('/resource/')
+    print(r.content)

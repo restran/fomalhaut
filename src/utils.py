@@ -16,6 +16,7 @@ from copy import copy
 import base64
 import hashlib
 import random
+
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
@@ -37,14 +38,15 @@ if PY3:
     class_types = type,
     text_type = str
     binary_type = bytes
-
-    MAXSIZE = sys.maxsize
+    # MAXSIZE = sys.maxsize
+    from urllib.parse import urlencode
 else:
     string_types = basestring,
     integer_types = (int, long)
     class_types = (type, types.ClassType)
     text_type = unicode
     binary_type = str
+    from urllib import urlencode
 
 # 拷贝 list
 copy_list = (lambda lb: copy(lb) if lb else [])
