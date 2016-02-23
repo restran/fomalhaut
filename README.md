@@ -86,7 +86,7 @@ REDIS_MAX_CONNECTIONS = 100
     "msg": "",
     "data": {
         "access_token": "abcd",
-        "refersh_token": "efgh"
+        "refersh_token": "efgh",
         "expires_in": 1456512810,
         "user_info": {
         
