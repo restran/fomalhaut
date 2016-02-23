@@ -3,7 +3,7 @@
 API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了之后，对这些 API 的管理和保护就带来了一系列的问题。比如：
 
 1. 如何保护 API 不被非法访问，只能由 App 正常发起请求？
-2. 如何控制不同 App 对 多种多样 API 的访问权限？
+2. 如何控制不同 App 对多种多样 API 的访问权限？
 3. API 的访问情况怎样，日志如何查看？
 
 于是，就有了 API Gateway 这个项目。
@@ -124,5 +124,6 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 - [x] 内置登录, 注销和更新 `access_token` 的 API
 - [ ] 单点登录, 在一个地方登录, 旧的 `access_token` 和 `refresh_token` 要失效
 - [ ] 访问统计数据, 原先为先缓存到 redis, 修改为直接写到 MongoDB
+- [ ] API 监控, 访问异常可以邮件告警
 - [ ] api-android-sdk
 - [ ] api-swift-sdk
