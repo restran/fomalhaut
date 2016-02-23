@@ -9,8 +9,7 @@ import logging.config
 
 # 当前目录所在路径
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
-# 模板路径
-TEMPLATE_PATH = os.path.join(BASE_PATH, 'templates')
+
 LOG_PATH = os.path.join(BASE_PATH, 'logs')
 
 HOST = '127.0.0.1'

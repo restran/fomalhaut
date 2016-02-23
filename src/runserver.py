@@ -28,9 +28,6 @@ define("port", default=settings.PORT, help="run on the given port", type=int)
 class Application(web.Application):
     def __init__(self):
         tornado_settings = dict(
-            template_path=settings.TEMPLATE_PATH,
-            # 不能设置 static 目录，否则所有以 /static/ 开头的 url 都不会去请求远端的网站
-            # static_path=os.path.join(os.path.dirname(__file__), "static"),
             # autoreload=True, # debug 模式会自动 autoreload
             debug=settings.DEBUG,
         )

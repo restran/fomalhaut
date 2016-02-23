@@ -6,11 +6,11 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 2. 如何控制不同 App 对 多种多样 API 的访问权限？
 3. API 的访问情况怎样，日志如何查看？
 
-于是，就有了 API Gateway 这样的东西。
+于是，就有了 API Gateway 这样项目。
 
 ## 环境及依赖
 
-当前只在 Python 2.7 环境下测试过
+需要安装 redis, 当前只在 Python 2.7 环境下测试过
 
 ```
 cerberus>=0.9
@@ -22,10 +22,37 @@ pycrypto
 ConcurrentLogHandler
 ```
 
+## 运行
+
+配置 settings.py 
+
+```py
+# 访问签名的有效时间, 秒
+SIGNATURE_EXPIRE_SECONDS = 3600
+
+HOST = '127.0.0.1'
+PORT = 6500
+
+# 是否调试模式
+DEBUG = False
+
+# redis 配置
+REDIS_HOST = '127.0.0.1'
+REDIS_PORT = 6379
+REDIS_DB = 0
+REDIS_PASSWORD = 'your_pasword'
+REDIS_MAX_CONNECTIONS = 100
+```
+
+运行
+
+    python runserver.py
+
 ## 相关项目
 
 1. [api-gateway-dashbaord](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
-2. [api-python-sdk](https://github.com/restran/api-python-sdk)
+2. [api-python-sdk](https://github.com/restran/api-python-sdk) python 版本的 API SDK
+
 
 ## 设计说明
 
@@ -45,14 +72,55 @@ ConcurrentLogHandler
 
 ### 登录校验
 
-存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。对于需要登录的 API，则需要先访问登录 API，然后获取一个长期令牌，然后由这个长期令牌生成或者获取短期的访问令牌 `access_token`。
+存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。api-gateway 内置了 Auth Endpoint, 包含了三个 API:
 
-以后访问需要登录的 API 时，就在 URL 参数中带上这个 `access_token`。API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_token` 去配置好的 `Auth API` 验证这个 `access_token` 是否有效，并获取该用户的信息。然后将用户信息存储在 Headers 中，以 `X-Api-User-Json` 传递给后端的 API。
+1. `/login/` 登录
+2. `/logout/` 注销
+3. `/token/` 用 `refresh_token` 获取新的 `access_token`
+
+对于需要登录的 API，则需要先访问 `/login/` 获取 `access_token`, 返回的数据如下:
+
+```json
+{
+    "code": 200,
+    "msg": "",
+    "data": {
+        "access_token": "abcd",
+        "refersh_token": "efgh"
+        "expires_in": 1456512810,
+        "user_info": {
+            ...
+        }
+    }
+}
+```
+
+- `expires_in`：`access_token` 的过期时间
+- `refersh_token`：当 `access_token` 过期时，用来获取新的 `access_token`
+- `user_info`：Auth API 返回的用户信息
+
+`/login/` API 会根据配置的 Auth API 去校验提交的登录信息是否正确，如果登录正确 Auth API 返回用户信息。
+
+`/token/` API 用来获取新的 `access_token`，提交的数据：
+
+```json
+{
+	"refersh_token": "efgh"
+}
+```
+
+以后访问需要登录保才能访问的 API 在 url 带上 access_token, 例如:
+
+    http://example.com/api/v1/?access_token=abcd
+
+API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_token` 去 redis 中验证这个 `access_token` 是否有效，并获取该用户的信息。然后将用户信息存储在 Headers 中，以 `X-Api-User-Json` 传递给后端的 API。该 Header 存储的数据是 user_info 的 json 字符串的 base64 编码数据。
 
 
 ## TODO
 
-- [x] 登录校验, 检查 access_token
-- [x] 内置登录, 注销和更新 access_token 的 API
-- [ ] 单点登录, 在一个地方登录, 旧的 access_token 和 refresh_token 要失效
-
+- [x] 登录校验, 检查 `access_token`
+- [x] 内置登录, 注销和更新 `access_token` 的 API
+- [ ] 单点登录, 在一个地方登录, 旧的 `access_token` 和 `refresh_token` 要失效
+- [ ] 访问统计数据, 原先为先缓存到 redis, 修改为直接写到 MongoDB
+- [ ] api-python-android
+- [ ] api-python-swift
