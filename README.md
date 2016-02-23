@@ -89,7 +89,7 @@ REDIS_MAX_CONNECTIONS = 100
         "refersh_token": "efgh"
         "expires_in": 1456512810,
         "user_info": {
-            ...
+        
         }
     }
 }
