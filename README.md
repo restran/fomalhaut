@@ -2,11 +2,11 @@
 
 API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了之后，对这些 API 的管理和保护就带来了一系列的问题。比如：
 
-1. 如何保护 API 不被非法访问，只能由 App 发起请求？
+1. 如何保护 API 不被非法访问，只能由 App 正常发起请求？
 2. 如何控制不同 App 对 多种多样 API 的访问权限？
 3. API 的访问情况怎样，日志如何查看？
 
-于是，就有了 API Gateway 这样项目。
+于是，就有了 API Gateway 这个项目。
 
 ## 环境及依赖
 
@@ -40,7 +40,7 @@ DEBUG = False
 REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
-REDIS_PASSWORD = 'your_pasword'
+REDIS_PASSWORD = 'your_password'
 REDIS_MAX_CONNECTIONS = 100
 ```
 
@@ -51,16 +51,18 @@ REDIS_MAX_CONNECTIONS = 100
 ## 相关项目
 
 1. [api-gateway-dashbaord](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
-2. [api-python-sdk](https://github.com/restran/api-python-sdk) python 版本的 API SDK
+2. [api-python-sdk](https://github.com/restran/api-python-sdk) Python 版本的 API SDK
 
 
 ## 设计说明
 
-这是一个 JSON API 的网关，实际上不管背后受保护的 API 传输的是什么，都能正常传输，只是网关会在出错时，以 JSON 数据返回错误信息。
-
-当前仅支持 `GET` 和 `POST` 方法。
+这是一个 JSON API 的网关，实际上不管背后受保护的 API 传输的是什么，都能正常传输，只是网关会在出错时，以 JSON 数据返回错误信息。在设计上借鉴了 [torngas](https://github.com/mqingyn/torngas) 的中间件模式。当前仅支持 `GET` 和 `POST` 方法。
 
 ![img.png](doc/design.png "")
+
+## 数据签名
+
+和大多数的云应用一样，每个 Client 将会分配一对 `access_key` 和 `sercret_key`。`access_key` 用来唯一标识这个 Client，`sercret_key` 则用来执行 HMAC 签名和 AES 加密。API 请求的 URL 和 Body 数据都会被 `secret_key` 签名，并且会双向验证数据的签名，保证请求和返回的数据没有被篡改
 
 ### 特殊状态码
 
@@ -68,7 +70,7 @@ REDIS_MAX_CONNECTIONS = 100
 
 ### AES 加密
 
-虽然 HTTPS 正在大多数网站中普及，但是如果仍然只能使用 HTTP，数据内容就存在泄漏的风险，因此提供了 AES 加密的功能，可以对传输数据的 URL、Headers、Body 都进行加密，并且会双向验证数据的签名，保证数据没有被篡改。AES 加密是可选的。
+虽然 HTTPS 正在大多数网站中普及，但是如果仍然只能使用 HTTP，或者存在中间人攻击，数据内容就存在泄漏的风险，因此提供了 AES 加密的功能，可以对传输数据的 URL、Headers、Body 都进行加密，AES 加密是可选的。
 
 ### 登录校验
 
@@ -122,5 +124,5 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 - [x] 内置登录, 注销和更新 `access_token` 的 API
 - [ ] 单点登录, 在一个地方登录, 旧的 `access_token` 和 `refresh_token` 要失效
 - [ ] 访问统计数据, 原先为先缓存到 redis, 修改为直接写到 MongoDB
-- [ ] api-python-android
-- [ ] api-python-swift
+- [ ] api-android-sdk
+- [ ] api-swift-sdk
