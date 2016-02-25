@@ -42,12 +42,19 @@ PORT = 6500
 # 是否调试模式
 DEBUG = False
 
-# redis 配置
+# Redis 配置
 REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
 REDIS_PASSWORD = 'your_password'
 REDIS_MAX_CONNECTIONS = 100
+
+# MongoDB 配置
+MONGO_HOST = '127.0.0.1'
+MONGO_PORT = 27017
+MONGO_USERNAME = 'api_gateway_user'
+MONGO_PASSWORD = 'api_gateway_password'
+MONGO_DBNAME = 'api_gateway'
 ```
 
 运行
