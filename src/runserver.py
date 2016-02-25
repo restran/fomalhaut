@@ -19,7 +19,6 @@ from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
 from utils import RedisHelper, import_string
 from utils import text_type, binary_type
 from handlers.proxy import BackendAPIHandler
-from handlers import TestHandler
 import settings
 from pymongo import ASCENDING, DESCENDING
 
