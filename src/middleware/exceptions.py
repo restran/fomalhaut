@@ -11,7 +11,11 @@ from tornado.web import HTTPError
 logger = logging.getLogger(__name__)
 
 
-class ClientErrorException(HTTPError):
+class APIGatewayException(HTTPError):
+    pass
+
+
+class ClientErrorException(APIGatewayException):
     """
     由客户端的错误引发的异常
     """
@@ -21,7 +25,7 @@ class ClientErrorException(HTTPError):
             GATEWAY_ERROR_STATUS_CODE, log_message, *args, **kwargs)
 
 
-class ServerErrorException(HTTPError):
+class ServerErrorException(APIGatewayException):
     """
     由服务端的错误引发的异常
     """

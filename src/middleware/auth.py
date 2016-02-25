@@ -3,13 +3,10 @@
 # created by restran on 2015/12/19
 
 from __future__ import unicode_literals, absolute_import
-import base64
-import json
-
 import time
 import logging
 import hmac
-from hashlib import sha256
+from hashlib import sha256, sha1
 import re
 import random
 import traceback
@@ -213,7 +210,8 @@ class HMACAuthHandler(object):
         # logger.debug(string_to_sign.decode('utf-8'))
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        hash_value = sha256(utf8(string_to_sign)).hexdigest()
+        # 先用 sha1 计算出需要被签名的字符串的 hash 值, 然后再用 sha256 进行 HMAC
+        hash_value = sha1(utf8(string_to_sign)).hexdigest()
         signature = self.sign_string(hash_value)
         return signature
 
@@ -238,7 +236,7 @@ class HMACAuthHandler(object):
         string_to_sign = self._request_string_to_sign(request)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        hash_value = sha256(utf8(string_to_sign)).hexdigest()
+        hash_value = sha1(utf8(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:
             logger.debug('Signature not match: %s, %s' % (signature, real_signature))
@@ -304,14 +302,6 @@ class ParseEndpointHandler(BaseMiddleware):
 
         if not endpoint.get('enable', True):
             raise AuthRequestException('Disabled Endpoint')
-
-        # version = endpoint.get('version')
-        # if version and version != '':
-        #     try:
-        #         # 处理 uri 前的版本号
-        #         _, uri = uri.split(version, 1)
-        #     except ValueError:
-        #         raise AuthRequestException('Invalid Request API Version')
 
         if not uri.startswith('/'):
             uri = '/' + uri

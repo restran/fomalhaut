@@ -9,7 +9,7 @@ import json as json_util
 import random
 import time
 import hmac
-from hashlib import sha256
+from hashlib import sha256, sha1
 from utils import utf8, encoded_dict, text_type, AESCipher, urlencode
 from urlparse import urlparse, urlunparse
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
@@ -276,7 +276,7 @@ class APIRequest(object):
         logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        hash_value = sha256(utf8(string_to_sign)).hexdigest()
+        hash_value = sha1(utf8(string_to_sign)).hexdigest()
         signature = self.sign_string(hash_value)
         return signature
 
@@ -305,7 +305,7 @@ class APIRequest(object):
         logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        hash_value = sha256(utf8(string_to_sign)).hexdigest()
+        hash_value = sha1(utf8(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:
             logger.debug('Signature not match: %s, %s' % (signature, real_signature))
