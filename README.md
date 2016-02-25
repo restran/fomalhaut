@@ -8,6 +8,12 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 
 于是，就有了 API Gateway 这个项目。
 
+## 类似项目
+
+[kong](https://getkong.org/)
+[zuul](https://github.com/Netflix/zuul)
+[strong-gateway](https://github.com/strongloop/strong-gateway)
+
 ## 环境及依赖
 
 需要安装 redis, 当前只在 Python 2.7 环境下测试过
@@ -51,7 +57,7 @@ REDIS_MAX_CONNECTIONS = 100
 ## 相关项目
 
 1. [api-gateway-dashbaord](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
-2. [api-python-sdk](https://github.com/restran/api-python-sdk) Python 版本的 API SDK
+2. [api-python-client](https://github.com/restran/api-python-client) Python 版本的 API Clinet
 
 
 ## 设计说明
@@ -60,9 +66,9 @@ REDIS_MAX_CONNECTIONS = 100
 
 ![img.png](doc/design.png "")
 
-## 数据签名
+## HMAC 签名
 
-和大多数的云应用一样，每个 Client 将会分配一对 `access_key` 和 `sercret_key`。`access_key` 用来唯一标识这个 Client，`sercret_key` 则用来执行 HMAC 签名和 AES 加密。API 请求的 URL 和 Body 数据都会被 `secret_key` 签名，并且会双向验证数据的签名，保证请求和返回的数据没有被篡改
+和大多数的云应用一样，每个 Client 将会分配一对 `access_key` 和 `sercret_key`。`access_key` 用来唯一标识这个 Client，`sercret_key` 则用来执行 HMAC 签名和 AES 加密。API 请求的 URL 和 Body 数据都会被 `secret_key` 签名，并且会双向验证数据的签名，保证请求和返回的数据没有被篡改。签名方法采用了 HMAC-SHA256。
 
 ### 特殊状态码
 
@@ -74,7 +80,7 @@ REDIS_MAX_CONNECTIONS = 100
 
 ### 登录校验
 
-存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。api-gateway 内置了 Auth Endpoint, 包含了三个 API:
+存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。api-gateway 内置了 Auth Endpoint (endpoint_name: auth, version: v1), 包含了三个 API:
 
 1. `/login/` 登录
 2. `/logout/` 注销
@@ -107,7 +113,7 @@ REDIS_MAX_CONNECTIONS = 100
 
 ```json
 {
-	"refersh_token": "efgh"
+    "refersh_token": "efgh"
 }
 ```
 
@@ -123,7 +129,8 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 - [x] 登录校验, 检查 `access_token`
 - [x] 内置登录, 注销和更新 `access_token` 的 API
 - [ ] 单点登录, 在一个地方登录, 旧的 `access_token` 和 `refresh_token` 要失效
-- [ ] 访问统计数据, 原先为先缓存到 redis, 修改为直接写到 MongoDB
+- [x] 访问统计数据, 原先为先缓存到 redis, 修改为直接写到 MongoDB
 - [ ] API 监控, 访问异常可以邮件告警
-- [ ] api-android-sdk
-- [ ] api-swift-sdk
+- [ ] Rate-Limiting
+- [ ] api-android-client
+- [ ] api-swift-client

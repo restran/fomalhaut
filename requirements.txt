@@ -3,5 +3,7 @@ requests
 six
 tornado>=4.0
 redis
+motor
 pycrypto
 ConcurrentLogHandler
+motor=0.5

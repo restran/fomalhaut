@@ -32,7 +32,7 @@ BUILTIN_ENDPOINTS = [
     {
         'config': {
             'name': 'auth',
-            'version': '1',
+            'version': 'v1',
             'builtin_endpoint': True
         },
         'handlers': [
@@ -57,12 +57,20 @@ DEFAULT_TIMEZONE = 'Asia/Shanghai'
 # 访问签名的有效时间,秒
 SIGNATURE_EXPIRE_SECONDS = 3600
 
+# Redis 配置
 # 这里如果使用localhost会导致速度变慢
 REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
 REDIS_PASSWORD = '5iveSec0nds'
 REDIS_MAX_CONNECTIONS = 100
+
+# MongoDB 配置
+MONGO_HOST = '127.0.0.1'
+MONGO_PORT = 27017
+MONGO_USERNAME = 'api_gateway_user'
+MONGO_PASSWORD = 'api_gateway_password'
+MONGO_DBNAME = 'api_gateway'
 
 # client 配置 redis 中 key 前缀
 CLIENT_CONFIG_REDIS_PREFIX = 'config'

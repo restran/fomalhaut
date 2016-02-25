@@ -13,11 +13,15 @@ import tornado.gen
 import tornado.httpclient
 from tornado.options import define, options
 from tornado import web
-
+import motor
+from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
+    MONGO_PASSWORD, MONGO_USERNAME
 from utils import RedisHelper, import_string
 from utils import text_type, binary_type
 from handlers.proxy import BackendAPIHandler
+from handlers import TestHandler
 import settings
+from pymongo import ASCENDING, DESCENDING
 
 logger = logging.getLogger(__name__)
 
@@ -27,26 +31,56 @@ define("port", default=settings.PORT, help="run on the given port", type=int)
 
 class Application(web.Application):
     def __init__(self):
+        # 创建一个数据库连接池
+        self.db_client = motor.motor_tornado.MotorClient(
+            MONGO_HOST, MONGO_PORT, max_pool_size=200)
+        # 验证数据库用户名和密码
+        self.db_client[MONGO_DBNAME].authenticate(
+            MONGO_USERNAME, MONGO_PASSWORD, mechanism='SCRAM-SHA-1')
+        self.database = self.db_client[MONGO_DBNAME]
+
         tornado_settings = dict(
             # autoreload=True, # debug 模式会自动 autoreload
             debug=settings.DEBUG,
+            db=self.database
         )
-
+        self._ensure_mongodb_index()
         self.middleware_list = []
-        self.load_middleware()
-        handlers = self.load_builtin_endpoints()
+        self.builtin_endpoints = settings.BUILTIN_ENDPOINTS
+        self._load_middleware()
+
+        handlers = self._load_builtin_endpoints()
         handlers.extend(
             [(r'/.*', BackendAPIHandler)]
         )
 
         web.Application.__init__(self, handlers, **tornado_settings)
 
-    def load_builtin_endpoints(self):
+    def _ensure_mongodb_index(self):
+        """
+        确保 mongodb 中有建立对应的索引
+        """
+        index_list = [
+            {
+                'collection': 'access_log',
+                'index': [
+                    'timestamp',
+                    'result_code',
+                    [('timestamp', DESCENDING), ('client_id', ASCENDING)],
+                    [('timestamp', DESCENDING), ('endpoint_name', ASCENDING),
+                     ('version', ASCENDING)]
+                ]
+            },
+        ]
+        for t in index_list:
+            self.database.access_log.ensure_index(t, background=True)
+
+    def _load_builtin_endpoints(self):
         """
         从 settings.BUILTIN_ENDPOINTS 载入内置的 endpoints
         """
         handlers = []
-        for endpoint in settings.BUILTIN_ENDPOINTS:
+        for endpoint in self.builtin_endpoints:
             c = endpoint['config']
             for url, handler_path in endpoint['handlers']:
                 h_class = import_string(handler_path)
@@ -56,7 +90,7 @@ class Application(web.Application):
                      '\n'.join([text_type(h) for h in handlers]))
         return handlers
 
-    def load_middleware(self):
+    def _load_middleware(self):
         """
         从 settings.MIDDLEWARE_CLASSES 载入中间件
         """

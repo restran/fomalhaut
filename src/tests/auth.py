@@ -128,7 +128,7 @@ class AuthEndpointTest(unittest.TestCase):
         self.secret_key = '1234'
         self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
         self.endpoint = 'auth'
-        self.version = '1'
+        self.version = 'v1'
 
     def test_login_refresh_logout(self):
         client = APIClient(self.access_key, self.secret_key, self.api_server)

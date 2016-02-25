@@ -135,7 +135,7 @@ class AESCipher(object):
         return s[:-ord(s[len(s) - 1:])]
 
 
-class ObjectId(object):
+class UniqueId(object):
     """
     生成唯一的id，用来存储分析统计日志
     """
@@ -151,7 +151,7 @@ class ObjectId(object):
 
 
 def new_random_token():
-    to_hash = ObjectId.new_object_id() + text_type(random.random())
+    to_hash = UniqueId.new_object_id() + text_type(random.random())
     token = hashlib.sha1(to_hash).hexdigest()
     logger.debug(token)
     return token
@@ -308,7 +308,7 @@ class RedisHelper(object):
         """
         try:
             json_data = json.dumps(log_item, ensure_ascii=False)
-            key = '%s:%s' % (settings.ANALYTICS_LOG_REDIS_PREFIX, ObjectId.new_object_id())
+            key = '%s:%s' % (settings.ANALYTICS_LOG_REDIS_PREFIX, UniqueId.new_object_id())
             cls.get_client().setex(key, json_data, settings.ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
             logger.info('add analytics log, %s' % key)
         except Exception as e:
