@@ -35,11 +35,12 @@ class ResultCode(object):
 
 
 class HTTPData(object):
-    content_type = ''
-    headers = None
-    body = None
-    headers_id = None
-    body_id = None
+    def __init__(self):
+        self.content_type = ''
+        self.headers = None
+        self.body = None
+        self.headers_id = None
+        self.body_id = None
 
     def get_json(self):
         j = {
@@ -90,8 +91,14 @@ class HTTPData(object):
 
 
 class HTTPRequestData(HTTPData):
-    method = None
-    uri = None
+    """
+    request 数据
+    """
+
+    def __init__(self):
+        super(HTTPRequestData, self).__init__()
+        self.uri = None
+        self.method = None
 
     def get_json(self):
         j = super(HTTPRequestData, self).get_json()
@@ -101,7 +108,13 @@ class HTTPRequestData(HTTPData):
 
 
 class HTTPResponseData(HTTPData):
-    status = None
+    """
+    response 数据
+    """
+
+    def __init__(self):
+        super(HTTPResponseData, self).__init__()
+        self.status = None
 
     def get_json(self):
         j = super(HTTPResponseData, self).get_json()
