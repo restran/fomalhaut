@@ -10,9 +10,9 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 
 ## 类似项目
 
-[kong](https://getkong.org/)
-[zuul](https://github.com/Netflix/zuul)
-[strong-gateway](https://github.com/strongloop/strong-gateway)
+- [kong](https://getkong.org/)
+- [zuul](https://github.com/Netflix/zuul)
+- [strong-gateway](https://github.com/strongloop/strong-gateway)
 
 ## 环境及依赖
 

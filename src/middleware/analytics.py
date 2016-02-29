@@ -47,6 +47,7 @@ class HTTPData(object):
             'headers_id': self.headers_id,
             'body_id': self.body_id
         }
+        logger.debug(j)
         return j
 
     @gen.coroutine
@@ -59,11 +60,13 @@ class HTTPData(object):
             self.headers_id = yield self.write_file(
                 db, '%s_%s' % (data_type, 'headers'), '\n'.join(header_list),
                 'text/plain', True)
+            logger.debug(self.headers_id)
 
         if self.body is not None:
             self.body_id = yield self.write_file(
                 db, '%s_%s' % (data_type, 'body'), self.body,
                 self.content_type, True)
+            logger.debug(self.body_id)
 
     @gen.coroutine
     def write_file(self, db, collection, data, content_type='', hash_id=False):
@@ -71,6 +74,7 @@ class HTTPData(object):
         content = StringIO(data)
         if not hash_id:
             _id = yield fs.put(content, content_type=content_type)
+            logger.debug(_id)
         else:
             _id = hashlib.sha1(content.getvalue()).hexdigest()
             exists = yield fs.exists(_id=_id)
@@ -82,7 +86,7 @@ class HTTPData(object):
 
             yield db['ref_%s' % collection].update({'_id': _id}, {'$inc': {'count': 1}}, upsert=True)
 
-        gen.Return(_id)
+        raise gen.Return(_id)
 
 
 class AnalyticsData(object):

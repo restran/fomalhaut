@@ -91,8 +91,7 @@ class BaseHandler(RequestHandler):
 
         ex = kwargs['exc_info'][1]
         # any 表示只要有一个为 true 就可以
-        if any(isinstance(ex, c) for c in
-               [ClientErrorException, ServerErrorException]):
+        if any(isinstance(ex, c) for c in [APIGatewayException]):
             logger.debug('api exception')
             # 根据异常,设置相应的 result_code
             if isinstance(ex, AuthRequestException):
@@ -134,8 +133,9 @@ class BaseHandler(RequestHandler):
                         if is_future(result):
                             yield result
                     except Exception as e:
-                        logger.error(e)
-                        logger.error(traceback.format_exc())
+                        if not isinstance(e, APIGatewayException):
+                            logger.error(e)
+                            logger.error(traceback.format_exc())
                         # 在某一层的中间件出现异常,下一级的都不执行
                         self.clear_nested_middleware(mv_class)
                         # 如果在 request 阶段就出现了异常,直接进入 finish

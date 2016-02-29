@@ -27,7 +27,7 @@ MIDDLEWARE_CLASSES = [
     'middleware.token.AuthAccessTokenHandler',
 ]
 
-# api-gateway 内置的 Endpoint
+# api-gateway 内置的 API Endpoint
 BUILTIN_ENDPOINTS = [
     {
         'config': {
