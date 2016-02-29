@@ -306,7 +306,7 @@ class ParseEndpointHandler(BaseMiddleware):
         if not uri.startswith('/'):
             uri = '/' + uri
 
-        if endpoint.get('builtin_endpoint', False):
+        if endpoint.get('is_builtin', False):
             # 如果是内置的 endpoint, 就没有 forward_url
             forward_url = None
         else:

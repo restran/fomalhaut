@@ -72,8 +72,10 @@ class APIRequest(object):
         url_parsed = urlparse(url)
         enc_params = urlencode(params)
         logger.debug(enc_params)
-        if url_parsed.query is None or url_parsed.query == '':
+        if url_parsed.query == '' or url_parsed.query is None:
             query = enc_params
+        elif enc_params == '' or enc_params is None:
+            query = url_parsed.query
         else:
             query = '%s&%s' % (url_parsed.query, enc_params)
 

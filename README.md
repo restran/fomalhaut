@@ -1,5 +1,7 @@
 # API Gateway
 
+This project is still in development, api may change anytime. If you want to use it, fix what you need.
+
 API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了之后，对这些 API 的管理和保护就带来了一系列的问题。比如：
 
 1. 如何保护 API 不被非法访问，只能由 App 正常发起请求？

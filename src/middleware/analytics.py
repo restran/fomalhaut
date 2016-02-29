@@ -89,49 +89,71 @@ class HTTPData(object):
         raise gen.Return(_id)
 
 
+class HTTPRequestData(HTTPData):
+    method = None
+    uri = None
+
+    def get_json(self):
+        j = super(HTTPRequestData, self).get_json()
+        j['method'] = self.method
+        j['uri'] = self.uri
+        return j
+
+
+class HTTPResponseData(HTTPData):
+    status = None
+
+    def get_json(self):
+        j = super(HTTPResponseData, self).get_json()
+        j['status'] = self.status
+        return j
+
+
 class AnalyticsData(object):
     """
     统计数据
     """
-    remote_ip = ''
-    request_uri = ''
-    encrypt_type = 'raw'
-    builtin_endpoint = False
-    client_id = None
-    client_name = ''
-    # 请求的 api 名称
-    endpoint_name = ''
-    endpoint_id = None
-    version = ''
-    forward_url = ''
-    method = ''
-    # 访问时间戳,精确到毫秒
-    timestamp = None
-    # 访问耗时
-    elapsed = None
-    # 返回结果的状态码
-    status_code = None
-    # API 访问结果代码
-    result_code = None
-    result_msg = ''
-    request = HTTPData()
-    response = HTTPData()
+
+    def __init__(self):
+        self.remote_ip = ''
+        self.request_uri = ''
+        self.encrypt_type = 'raw'
+        self.is_builtin = False
+        self.client_id = None
+        self.client_name = ''
+        # 请求的 api 名称
+        self.endpoint_name = ''
+        self.endpoint_id = None
+        self.version = ''
+        self.forward_url = ''
+        # 访问时间戳,精确到毫秒
+        self.timestamp = None
+        # 访问耗时
+        self.elapsed = None
+        # 返回结果的状态码
+        self.status_code = None
+        # API 访问结果代码
+        self.result_code = None
+        self.result_msg = ''
+        self.request = HTTPRequestData()
+        self.response = HTTPResponseData()
 
     def get_json(self):
         json_data = {
             'remote_ip': self.remote_ip,
-            'request_uri': self.request_uri,
-            'client_id': self.client_id,
-            'client_name': self.client_name,
-            'endpoint_name': self.endpoint_name,
-            'endpoint_id': self.endpoint_id,
-            'builtin_endpoint': self.builtin_endpoint,
-            'version': self.version,
+            'client': {
+                'id': self.client_id,
+                'name': self.client_name,
+            },
+            'endpoint': {
+                'id': self.endpoint_id,
+                'name': self.endpoint_name,
+                'version': self.version,
+                'is_builtin': self.is_builtin,
+            },
             'forward_url': self.forward_url,
-            'method': self.method,
             'timestamp': self.timestamp,
             'elapsed': self.elapsed,
-            'status_code': self.status_code,
             'result_code': self.result_code,
             'result_msg': self.result_msg,
             'request': self.request.get_json(),
@@ -166,9 +188,9 @@ class AnalyticsHandler(BaseMiddleware):
         x_real_ip = request.headers.get('X-Real-Ip')
         remote_ip = request.remote_ip if not x_real_ip else x_real_ip
         analytics.remote_ip = remote_ip
-        analytics.request_uri = request.uri
-        analytics.method = request.method
+        analytics.request.uri = request.uri
         analytics.timestamp = int(time.time() * 1000)
+        analytics.request.method = request.method
         analytics.request.content_type = request.headers.get('Content-Type', '')
         analytics.request.headers = request.headers
         analytics.request.body = request.body
@@ -181,7 +203,7 @@ class AnalyticsHandler(BaseMiddleware):
         """
         logger.debug('process_finished')
         analytics = self.handler.analytics
-        analytics.status_code = self.handler.get_status()
+        analytics.response.status = self.handler.get_status()
         now_ts = int(time.time() * 1000)
         analytics.elapsed = now_ts - analytics.timestamp
 
@@ -194,7 +216,7 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.endpoint_name = endpoint.get('name')
             analytics.endpoint_id = endpoint.get('id')
             analytics.version = endpoint.get('version')
-            analytics.builtin_endpoint = endpoint.get('builtin_endpoint', False)
+            analytics.is_builtin = endpoint.get('is_builtin', False)
             analytics.forward_url = client.request.get('forward_url')
             response = self.handler.endpoint_response
             analytics.response.content_type = response.headers.get('Content-Type', '')
