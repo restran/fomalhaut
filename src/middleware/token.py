@@ -33,7 +33,7 @@ class AuthAccessTokenHandler(BaseMiddleware):
 
         if token_info is not None:
             if token_info['access_key'] != self.handler.client.access_key:
-                raise AuthRequestException('This Access Token is Belongs to Another Client App')
+                raise AuthRequestException('This Access Token Belongs to Another Client App')
 
             logger.debug('允许访问')
             try:

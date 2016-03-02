@@ -20,7 +20,6 @@ from utils import RedisHelper, import_string
 from utils import text_type, binary_type
 from handlers.proxy import BackendAPIHandler
 import settings
-from pymongo import ASCENDING, DESCENDING
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class Application(web.Application):
             debug=settings.DEBUG,
             db=self.database
         )
-        self._ensure_mongodb_index()
+
         self.middleware_list = []
         self.builtin_endpoints = settings.BUILTIN_ENDPOINTS
         self._load_middleware()
@@ -54,25 +53,6 @@ class Application(web.Application):
         )
 
         web.Application.__init__(self, handlers, **tornado_settings)
-
-    def _ensure_mongodb_index(self):
-        """
-        确保 mongodb 中有建立对应的索引
-        """
-        index_list = [
-            {
-                'collection': 'access_log',
-                'index': [
-                    'timestamp',
-                    'result_code',
-                    [('timestamp', DESCENDING), ('client_id', ASCENDING)],
-                    [('timestamp', DESCENDING), ('endpoint_name', ASCENDING),
-                     ('version', ASCENDING)]
-                ]
-            },
-        ]
-        for t in index_list:
-            self.database.access_log.ensure_index(t, background=True)
 
     def _load_builtin_endpoints(self):
         """

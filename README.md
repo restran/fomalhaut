@@ -28,6 +28,7 @@ tornado>=4.0
 redis
 pycrypto
 ConcurrentLogHandler
+motor=0.5
 ```
 
 ## 运行

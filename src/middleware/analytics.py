@@ -12,6 +12,7 @@ from tornado import gen
 import motor
 from cStringIO import StringIO
 import hashlib
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,8 @@ class HTTPData(object):
     def get_json(self):
         j = {
             'content_type': self.content_type,
-            'headers_id': self.headers_id,
-            'body_id': self.body_id
+            'headers': self.headers_id,
+            'body': self.body_id
         }
         logger.debug(j)
         return j
@@ -128,7 +129,7 @@ class AnalyticsData(object):
     """
 
     def __init__(self):
-        self.remote_ip = ''
+        self.ip = ''
         self.request_uri = ''
         self.encrypt_type = 'raw'
         self.is_builtin = False
@@ -140,7 +141,7 @@ class AnalyticsData(object):
         self.version = ''
         self.forward_url = ''
         # 访问时间戳,精确到毫秒
-        self.timestamp = None
+        self.timestamp = int(time.time() * 1000)
         # 访问耗时
         self.elapsed = None
         # 返回结果的状态码
@@ -153,7 +154,7 @@ class AnalyticsData(object):
 
     def get_json(self):
         json_data = {
-            'remote_ip': self.remote_ip,
+            'ip': self.ip,
             'client': {
                 'id': self.client_id,
                 'name': self.client_name,
@@ -165,7 +166,7 @@ class AnalyticsData(object):
                 'is_builtin': self.is_builtin,
             },
             'forward_url': self.forward_url,
-            'timestamp': self.timestamp,
+            'accessed_at': datetime.fromtimestamp(self.timestamp / 1000.0),
             'elapsed': self.elapsed,
             'result_code': self.result_code,
             'result_msg': self.result_msg,
@@ -200,13 +201,12 @@ class AnalyticsHandler(BaseMiddleware):
         analytics = self.handler.analytics
         x_real_ip = request.headers.get('X-Real-Ip')
         remote_ip = request.remote_ip if not x_real_ip else x_real_ip
-        analytics.remote_ip = remote_ip
-        analytics.request.uri = request.uri
-        analytics.timestamp = int(time.time() * 1000)
-        analytics.request.method = request.method
-        analytics.request.content_type = request.headers.get('Content-Type', '')
-        analytics.request.headers = request.headers
-        analytics.request.body = request.body
+        analytics.ip = remote_ip
+        # analytics.request.uri = request.uri
+        # analytics.request.method = request.method
+        # analytics.request.content_type = request.headers.get('Content-Type', '')
+        # analytics.request.headers = request.headers
+        # analytics.request.body = request.body
 
     @gen.coroutine
     def process_finished(self):
@@ -219,6 +219,14 @@ class AnalyticsHandler(BaseMiddleware):
         analytics.response.status = self.handler.get_status()
         now_ts = int(time.time() * 1000)
         analytics.elapsed = now_ts - analytics.timestamp
+
+        # 如果使用了 AES 加密, 那么在 process_request 阶段获取到的只是加密后的数据
+        request = self.handler.request
+        analytics.request.uri = request.uri
+        analytics.request.method = request.method
+        analytics.request.content_type = request.headers.get('Content-Type', '')
+        analytics.request.headers = request.headers
+        analytics.request.body = request.body
 
         client = self.handler.client
         # 如果 client 为空表示未能通过 HMAC 签名鉴权
