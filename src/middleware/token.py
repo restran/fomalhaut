@@ -6,7 +6,7 @@ import json
 import logging
 import traceback
 
-from handlers.base import AuthRequestException
+from handlers.base import LoginAuthException
 from utils import RedisHelper
 from middleware import BaseMiddleware
 
@@ -28,12 +28,16 @@ class AuthAccessTokenHandler(BaseMiddleware):
         if not require_login:
             return
 
-        access_token = self.handler.get_query_argument('access_token', None)
+        # 默认从 headers 中获取
+        access_token = self.handler.request.headers.get('X-Api-Access-Token', None)
+        # 如果没有获取到,再从 url 中获取
+        if access_token is None:
+            access_token = self.handler.get_query_argument('access_token', None)
         token_info = RedisHelper.get_access_token_info(access_token)
 
         if token_info is not None:
             if token_info['access_key'] != self.handler.client.access_key:
-                raise AuthRequestException('This Access Token Belongs to Another Client App')
+                raise LoginAuthException('This Access Token Belongs to Another Client App')
 
             logger.debug('允许访问')
             try:
@@ -47,4 +51,4 @@ class AuthAccessTokenHandler(BaseMiddleware):
         else:
             logger.info('没有获取到用户信息，不允许访问')
             # 获取用户信息失败
-            raise AuthRequestException('Expired or Invalid Access Token')
+            raise LoginAuthException('Expired or Invalid Access Token')

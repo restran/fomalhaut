@@ -21,18 +21,18 @@ class ResultCode(object):
     """
     响应结果的编码
     """
-    # 访问正常
-    OK = 200
     # 请求的参数不完整
     BAD_REQUEST = 400
-    # 鉴权失败,禁止访问
+    # 登录验证失败
+    BAD_ACCESS_TOKEN = 401
+    # HMAC 鉴权失败,禁止访问
     BAD_AUTH_REQUEST = 403
     # 服务器处理发生异常
     INTERNAL_SERVER_ERROR = 500
-    # 访问 endpoint server 出现错误
-    REQUEST_ENDPOINT_ERROR = 502
+    # 访问 endpoint server 出现错误, 服务不可用
+    REQUEST_ENDPOINT_ERROR = 503
     # client 缺少配置,或配置有误
-    CLIENT_CONFIG_ERROR = 503
+    CLIENT_CONFIG_ERROR = 510
 
 
 class HTTPData(object):

@@ -98,6 +98,10 @@ class BaseHandler(RequestHandler):
                 self.analytics.result_code = ResultCode.BAD_AUTH_REQUEST
             elif isinstance(ex, ClientBadConfigException):
                 self.analytics.result_code = ResultCode.CLIENT_CONFIG_ERROR
+            elif isinstance(ex, LoginAuthException):
+                self.analytics.result_code = ResultCode.BAD_ACCESS_TOKEN
+            elif isinstance(ex, ServerErrorException):
+                self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
             elif self.analytics.result_code is None:
                 self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
 

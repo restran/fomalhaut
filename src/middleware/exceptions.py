@@ -41,6 +41,12 @@ class ClientBadConfigException(ServerErrorException):
     """
 
 
+class LoginAuthException(ClientErrorException):
+    """
+    验证 access_token 判断是否登录
+    """
+
+
 class AuthRequestException(ClientErrorException):
     """
     非法请求, 签名错误, 时间戳过期
