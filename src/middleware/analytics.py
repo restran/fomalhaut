@@ -21,6 +21,8 @@ class ResultCode(object):
     """
     响应结果的编码
     """
+    # 成功
+    OK = 200
     # 请求的参数不完整
     BAD_REQUEST = 400
     # 登录验证失败
@@ -240,9 +242,10 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.is_builtin = endpoint.get('is_builtin', False)
             analytics.forward_url = client.request.get('forward_url')
             response = self.handler.endpoint_response
-            analytics.response.content_type = response.headers.get('Content-Type', '')
-            analytics.response.headers = response.headers
-            analytics.response.body = response.body
+            if response is not None:
+                analytics.response.content_type = response.headers.get('Content-Type', '')
+                analytics.response.headers = response.headers
+                analytics.response.body = response.body
 
         db = self.handler.settings['db']
         # 将统计数据存储在 MongoDB 中
