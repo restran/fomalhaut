@@ -135,6 +135,7 @@ class AuthEndpointTest(unittest.TestCase):
         req = APIRequest(client, self.endpoint, self.version)
 
         r = req.get('/login')
+        print(r.content)
         self.assertEqual(r.status_code, 405)
         json_data = {
             'name': 'name',

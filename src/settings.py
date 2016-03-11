@@ -32,8 +32,7 @@ BUILTIN_ENDPOINTS = [
     {
         'config': {
             'name': 'auth',
-            'version': 'v1',
-            'is_builtin': True
+            'version': 'v1'
         },
         'handlers': [
             ('/login/?', 'handlers.endpoint.AuthLoginHandler'),

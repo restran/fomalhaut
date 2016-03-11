@@ -31,7 +31,7 @@ class Validator(object):
     @classmethod
     def schema(cls, input_schema=None):
         """
-        验证提交的 json 数据格式是否正
+        验证提交的 json 数据格式是否正确
         :param input_schema:
         :return:
         """

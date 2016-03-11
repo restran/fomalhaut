@@ -124,11 +124,11 @@ class Client(object):
             raise AuthRequestException('Disabled Client')
 
         self.secret_key = config_data.get('secret_key')
-        # 添加内置的 endpoint
-        for t in settings.BUILTIN_ENDPOINTS:
-            endpoint = t['config']
-            k = '%s:%s' % (endpoint['name'], endpoint['version'])
-            config_data['endpoints'][k] = endpoint
+        # 内置的 endpoint 由控制台配置, 不再自动添加
+        # for t in settings.BUILTIN_ENDPOINTS:
+        #     endpoint = t['config']
+        #     k = '%s:%s' % (endpoint['name'], endpoint['version'])
+        #     config_data['endpoints'][k] = endpoint
 
         self.config = config_data
 
