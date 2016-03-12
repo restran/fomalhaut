@@ -80,6 +80,7 @@ class EncryptHandler(BaseMiddleware):
         client = self.handler.client
         response_body = b''.join(self.handler.get_write_buffer())
         if client.encrypt_type == 'raw' or not len(response_body) > 0:
+            self.handler.set_header('X-Api-Encrypt-Type', 'raw')
             return
 
         def encrypt_data(body):

@@ -12,6 +12,7 @@ from middleware.exceptions import *
 from tornado.web import RequestHandler
 from tornado.concurrent import is_future
 from tornado import gen
+from tornado.httputil import HTTPHeaders
 from tornado.web import HTTPError
 from middleware.analytics import AnalyticsData
 from utils import text_type, copy_list
@@ -35,7 +36,7 @@ class BaseHandler(RequestHandler):
         # 请求 client 的相关信息
         self.client = None
         self.analytics = AnalyticsData()
-        self.endpoint_response = None
+        self.response = {'headers': HTTPHeaders(), 'body': ''}
         # 拷贝一份中间件的列表
         self.middleware_list = copy_list(self.application.middleware_list)
 
@@ -55,7 +56,7 @@ class BaseHandler(RequestHandler):
         logger.debug(self.middleware_list)
 
     def get_response_headers(self):
-        return getattr(self, '_headers', [])
+        return getattr(self, '_headers', HTTPHeaders())
 
     def clear_write_buffer(self):
         setattr(self, '_write_buffer', [])
@@ -69,8 +70,6 @@ class BaseHandler(RequestHandler):
         :param status_code: HTTP status code
         """
         logger.debug('write_error')
-        # 出现异常,清理所有的中间件,
-        # self.clear_all_middleware()
 
         def get_exc_message(e):
             return e.log_message if \

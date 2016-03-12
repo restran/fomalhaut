@@ -2,7 +2,7 @@ cerberus>=0.9
 requests
 six
 tornado>=4.0
-motor=0.5
+motor>=0.5
 redis
 pycrypto
 ConcurrentLogHandler

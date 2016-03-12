@@ -150,7 +150,9 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = {'Host': request.headers.get('Host')}
         for name, value in request.headers.items():
-            if name.lower().startswith('x-api-'):
+            l_name = name.lower()
+            # 计算签名的时候, 不能包含 x-api-signature
+            if l_name.startswith('x-api-') and l_name != 'x-api-signature':
                 headers_to_sign[name] = value
         return headers_to_sign
 
@@ -161,8 +163,11 @@ class HMACAuthHandler(object):
         """
         headers_to_sign = {}
         for name, value in response_headers.items():
-            if name.lower().startswith('x-api-'):
+            l_name = name.lower()
+            # 计算签名的时候, 不能包含 x-api-signature
+            if l_name.startswith('x-api-') and l_name != 'x-api-signature':
                 headers_to_sign[name] = value
+            logger.debug(headers_to_sign)
         return headers_to_sign
 
     def _canonical_headers(self, headers_to_sign):
@@ -227,9 +232,7 @@ class HMACAuthHandler(object):
             raise AuthRequestException('Expired Signature')
 
         signature = request.headers.get('X-Api-Signature')
-        if signature:
-            del request.headers['X-Api-Signature']
-        else:
+        if not signature:
             logger.debug('No Signature Provided')
             raise AuthRequestException('No Signature Provided')
 
@@ -260,6 +263,7 @@ class AuthenticateHandler(BaseMiddleware):
     def process_response(self, *args, **kwargs):
         logger.debug('process_response')
         auth_handler = HMACAuthHandler(self.handler.client)
+
         headers = {
             'X-Api-Timestamp': text_type(int(time.time())),
             'X-Api-Nonce': text_type(random.random()),
@@ -268,14 +272,18 @@ class AuthenticateHandler(BaseMiddleware):
             self.handler.set_header(k, v)
 
         response_body = b''.join(self.handler.get_write_buffer())
+        response_headers = self.handler.get_response_headers()
         # logger.debug(response_body.decode('utf-8'))
         # logger.debug(dict(self.handler.get_response_headers()))
         signature = auth_handler.signature_response(
-            self.handler.get_response_headers(),
+            response_headers,
             self.handler.request, response_body)
 
         # 对返回结果进行签名
         self.handler.set_header('X-Api-Signature', signature)
+
+        self.handler.response['headers'] = response_headers
+        self.handler.response['body'] = response_body
         logger.debug('process_response_done')
 
 

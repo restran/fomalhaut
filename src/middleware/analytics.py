@@ -80,7 +80,8 @@ class HTTPData(object):
             _id = yield fs.put(content, content_type=content_type)
             logger.debug(_id)
         else:
-            _id = hashlib.sha1(content.getvalue()).hexdigest()
+            # _id = hashlib.sha1(content.getvalue()).hexdigest()
+            _id = hashlib.sha1(content.getvalue()).digest().encode("base64").rstrip('\n')
             exists = yield fs.exists(_id=_id)
             if not exists:
                 try:
@@ -241,11 +242,13 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.version = endpoint.get('version')
             analytics.is_builtin = endpoint.get('is_builtin', False)
             analytics.forward_url = client.request.get('forward_url')
-            response = self.handler.endpoint_response
-            if response is not None:
-                analytics.response.content_type = response.headers.get('Content-Type', '')
-                analytics.response.headers = response.headers
-                analytics.response.body = response.body
+
+            response = self.handler.response
+            response_headers = response['headers']
+            response_body = response['body']
+            analytics.response.content_type = response_headers.get('Content-Type', '')
+            analytics.response.headers = response_headers
+            analytics.response.body = response_body
 
         db = self.handler.settings['db']
         # 将统计数据存储在 MongoDB 中

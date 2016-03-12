@@ -13,6 +13,7 @@ import tornado.options
 import tornado.web
 import tornado.gen
 import tornado.httpclient
+from tornado.httputil import HTTPHeaders
 from tornado.httpclient import HTTPRequest
 from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
 
@@ -49,10 +50,10 @@ class BackendAPIHandler(BaseHandler):
         headers = self.request.headers
         # 更新host字段为后端访问网站的host
         headers['Host'] = self.client.request['endpoint']['netloc']
-        new_headers = {}
+        new_headers = HTTPHeaders()
         # 如果 header 有的是 str，有的是 unicode
         # 会出现 422 错误
-        for name, value in headers.iteritems():
+        for name, value in headers.get_all():
             # 过滤 x-api 开头的,这些只是发给 api-gateway
             l_name = name.lower()
             if l_name.startswith('x-api-') and l_name != 'x-api-user-json':
@@ -63,7 +64,7 @@ class BackendAPIHandler(BaseHandler):
             elif l_name == 'content-length':
                 pass
             else:
-                new_headers[text_type(name)] = text_type(value)
+                new_headers.add(text_type(name), text_type(value))
 
         return new_headers
 
@@ -128,6 +129,7 @@ class BackendAPIHandler(BaseHandler):
             self.set_status(response.code, 'Unknown Status Code')
             logger.warning('proxy %s encounters unknown status code,  %s' % (forward_url, response.code))
 
+        # 这里要用 get_all 因为要按顺序
         for (k, v) in response.headers.get_all():
             # 隐藏后端网站真实服务器名称
             if k == 'Server' or k == 'X-Powered-By':
@@ -159,7 +161,6 @@ class BackendAPIHandler(BaseHandler):
         logger.debug("local response headers: %s" % self._headers)
         # 更新返回的 headers
         response.headers = self._headers
-        self.endpoint_response = response
         # 这里不直接 write,等到最后要finish的时候才write
         # 因为在上一级的中间件中会对数据重新处理,比如加密
         self.write(response.body)

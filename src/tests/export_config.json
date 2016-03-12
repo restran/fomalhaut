@@ -3,14 +3,20 @@
         {
             "client_id": 3, 
             "enable": true, 
+            "endpoint_id": 4, 
+            "id": 23
+        }, 
+        {
+            "client_id": 3, 
+            "enable": true, 
             "endpoint_id": 2, 
-            "id": 21
+            "id": 24
         }, 
         {
             "client_id": 3, 
             "enable": true, 
             "endpoint_id": 3, 
-            "id": 22
+            "id": 25
         }
     ], 
     "clients": [
@@ -24,9 +30,35 @@
             "name": "test_client", 
             "refresh_token_ex": 1728000, 
             "secret_key": "1234"
+        }, 
+        {
+            "access_key": "a5d456590c5898086898", 
+            "access_token_ex": 864000, 
+            "enable": true, 
+            "id": 4, 
+            "login_auth_url": "", 
+            "memo": "", 
+            "name": "test_client2", 
+            "refresh_token_ex": 1728000, 
+            "secret_key": "06b9d1bfa0613614588d2f744ea587d346bb1e9b"
         }
     ], 
     "endpoints": [
+        {
+            "acl_rules": [], 
+            "async_http_connect_timeout": 20, 
+            "async_http_request_timeout": 20, 
+            "enable_acl": false, 
+            "id": 4, 
+            "is_builtin": true, 
+            "memo": "", 
+            "name": "auth", 
+            "netloc": "", 
+            "require_login": false, 
+            "unique_name": "Auth", 
+            "url": "", 
+            "version": "v1"
+        }, 
         {
             "acl_rules": [
                 {
@@ -46,6 +78,7 @@
             "async_http_request_timeout": 20, 
             "enable_acl": true, 
             "id": 2, 
+            "is_builtin": false, 
             "memo": "", 
             "name": "test_api", 
             "netloc": "127.0.0.1:8001", 
@@ -67,6 +100,7 @@
             "async_http_request_timeout": 20, 
             "enable_acl": true, 
             "id": 3, 
+            "is_builtin": false, 
             "memo": "", 
             "name": "test_api_login", 
             "netloc": "127.0.0.1:8001", 
