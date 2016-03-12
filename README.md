@@ -69,7 +69,7 @@ MONGO_DBNAME = 'api_gateway'
 ## 相关项目
 
 1. [api-gateway-dashbaord](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
-2. [api-python-client](https://github.com/restran/api-python-client) Python 版本的 API Clinet
+2. [api-python-client](https://github.com/restran/api-python-client) Python 版本的 API Client
 
 
 ## 设计说明
