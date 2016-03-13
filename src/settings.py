@@ -83,6 +83,11 @@ ANALYTICS_LOG_REDIS_PREFIX = 'a'
 # 分析统计日志，在 redis 中的过期时间
 ANALYTICS_LOG_REDIS_EXPIRE_SECONDS = 30 * 60
 
+# 最大的 headers, 超过的部分会被截断
+ACCESS_LOG_HEADERS_MAX_LENGTH = 50 * 1024
+# 最大的 body, 超过的部分会被截断
+ACCESS_LOG_BODY_MAX_LENGTH = 500 * 1024
+
 # 基础配置在 redis 中的 key
 # BASE_CONFIG_REDIS_KEY = 'base_config'
 

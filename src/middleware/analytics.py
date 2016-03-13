@@ -6,6 +6,7 @@ from __future__ import unicode_literals, absolute_import
 
 import time
 from gridfs.errors import FileExists
+from settings import ACCESS_LOG_BODY_MAX_LENGTH, ACCESS_LOG_HEADERS_MAX_LENGTH
 from middleware.exceptions import *
 from middleware import BaseMiddleware
 from tornado import gen
@@ -60,15 +61,28 @@ class HTTPData(object):
             header_list = []
             for k, v in self.headers.get_all():
                 header_list.append('%s: %s' % (k, v))
+            content = '\n'.join(header_list)
+            if content == '':
+                self.headers_id = None
+            else:
+                # 内容过长, 截断
+                if len(content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
+                    content = content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
 
-            self.headers_id = yield self.write_file(
-                db, '%s_%s' % (data_type, 'headers'), '\n'.join(header_list),
-                'text/plain', True)
-            logger.debug(self.headers_id)
+                self.headers_id = yield self.write_file(
+                    db, '%s_%s' % (data_type, 'headers'), content,
+                    'text/plain', True)
+                logger.debug(self.headers_id)
 
-        if self.body is not None:
+        if self.body is not None and self.body != '':
+            # 内容过长, 截断
+            if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
+                content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
+            else:
+                content = self.body
+
             self.body_id = yield self.write_file(
-                db, '%s_%s' % (data_type, 'body'), self.body,
+                db, '%s_%s' % (data_type, 'body'), content,
                 self.content_type, True)
             logger.debug(self.body_id)
 
@@ -80,15 +94,18 @@ class HTTPData(object):
             _id = yield fs.put(content, content_type=content_type)
             logger.debug(_id)
         else:
-            # _id = hashlib.sha1(content.getvalue()).hexdigest()
-            _id = hashlib.sha1(content.getvalue()).digest().encode("base64").rstrip('\n')
-            exists = yield fs.exists(_id=_id)
-            if not exists:
-                try:
-                    yield fs.put(content, content_type=content_type, _id=_id)
-                except FileExists:
-                    pass
+            # TODO md5 may not safe to check content unique
+            md5 = hashlib.md5(content.getvalue()).hexdigest()
+            # file_name = hashlib.sha1(content.getvalue()).digest().encode("base64").rstrip('\n')
+            grid_out = yield fs.find_one({'md5': md5})
+            if not grid_out:
+                _id = yield fs.put(content, content_type=content_type)
+            else:
+                _id = grid_out._id
 
+            # 直接让引用计数的 _id 等于 file 的 _id
+            logger.debug(_id)
+            logger.debug(collection)
             yield db['ref_%s' % collection].update({'_id': _id}, {'$inc': {'count': 1}}, upsert=True)
 
         raise gen.Return(_id)
