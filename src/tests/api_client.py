@@ -10,7 +10,7 @@ import random
 import time
 import hmac
 from hashlib import sha256, sha1
-from utils import utf8, encoded_dict, text_type, AESCipher, urlencode
+from utils import utf8, encoded_dict, text_type, binary_type, AESCipher, urlencode
 from urlparse import urlparse, urlunparse
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
 import requests
@@ -150,6 +150,10 @@ class APIRequest(object):
             logger.error(e)
             logger.error(traceback.format_exc())
             return None
+
+        # 由于 requests 的 content 不是 unicode 类型, 为了兼容, 这里改成 utf8
+        if isinstance(body, unicode):
+            body = body.encode('utf-8')
 
         return body
 
@@ -326,7 +330,7 @@ if __name__ == '__main__':
     request = APIRequest(client, endpoint, version)
     params = {'a': 1, 'b': '2'}
     r = request.get('/resource/?q=123', params=params)
-    print(r.content)
+    # print(r.content)
 
     json_data = {
         'a': 1,
@@ -335,8 +339,12 @@ if __name__ == '__main__':
     }
 
     r = request.post('/resource/', json=json_data)
-    print(r.content)
+    print(type(r.content))
+    print(type(r.text))
+    print(r.json())
 
     request = APIRequest(client, endpoint, version, 'aes')
-    r = request.get('/resource/')
+    r = request.post('/resource/', json=json_data)
     print(r.content)
+    print(r.text)
+    print(r.json())

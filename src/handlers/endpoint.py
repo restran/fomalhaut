@@ -76,10 +76,15 @@ class Validator(object):
         return _validate
 
 
-class BuiltinAPIHandler(BaseHandler):
-    def __init__(self, app, request, **kwargs):
-        super(BuiltinAPIHandler, self).__init__(app, request, **kwargs)
+class BuiltinAPIHandler(object):
+    def __init__(self, handler, *args, **kwargs):
         self.post_data = {}
+        self.handler = handler
+        self.request = self.handler.request
+        self.client = self.handler.client
+        self.write = self.handler.write
+        self.set_header = self.handler.set_header
+        self.finish = self.handler.finish
 
         if self.request.method == 'POST':
             content_type = self.request.headers.get('Content-Type', '').lower()
@@ -91,10 +96,7 @@ class BuiltinAPIHandler(BaseHandler):
                     logger.error(e)
             logger.debug(self.post_data)
 
-    def initialize(self, *args, **kwargs):
         self.set_header("Content-Type", "application/json; charset=utf-8")
-
-    # def prepare(self):
 
     def success(self, data=None, msg=''):
         json_str = json.dumps({

@@ -27,10 +27,21 @@ from handlers.base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-class BackendAPIHandler(BaseHandler):
+class BackendAPIHandler(object):
     """
     处理代理请求
     """
+    def __init__(self, handler, *args, **kwargs):
+        self.post_data = {}
+        self.handler = handler
+        self.request = self.handler.request
+        self.client = self.handler.client
+        self.analytics = self.handler.analytics
+        self.write = self.handler.write
+        self.set_header = self.handler.set_header
+        self.finish = self.handler.finish
+        self.set_status = self.handler.set_status
+        self.add_header = self.handler.add_header
 
     @gen.coroutine
     def get(self):
@@ -159,9 +170,8 @@ class BackendAPIHandler(BaseHandler):
             else:
                 self.set_header(k, v)
 
-        logger.debug("local response headers: %s" % self._headers)
-        # 更新返回的 headers
-        response.headers = self._headers
+        logger.debug("local response headers: %s" % self.handler._headers)
+
         # 这里不直接 write,等到最后要finish的时候才write
         # 因为在上一级的中间件中会对数据重新处理,比如加密
         self.write(response.body)

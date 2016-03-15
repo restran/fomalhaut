@@ -16,6 +16,7 @@ from handlers.base import AuthRequestException, ClientBadConfigException
 from utils import RedisHelper, utf8, text_type
 from middleware import BaseMiddleware
 from cerberus import Validator
+from handlers.proxy import BackendAPIHandler
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +318,21 @@ class ParseEndpointHandler(BaseMiddleware):
         if endpoint.get('is_builtin', False):
             # 如果是内置的 endpoint, 就没有 forward_url
             forward_url = None
+
+            # 寻找匹配的内置 Endpoint Handler
+            key = '%s/%s' % (endpoint['name'], endpoint['version'])
+            builtin_handlers = self.handler.builtin_endpoints.get(key, [])
+            self.handler.real_api_handler = None
+            for t in builtin_handlers:
+                re_uri, _handler = t
+                pattern = re.compile(re_uri)
+                match = pattern.search(uri)
+                if match:
+                    self.handler.real_api_handler = _handler
+                    break
         else:
+            # 后端的 API, 需要代理访问
+            self.handler.real_api_handler = BackendAPIHandler
             # 解析要转发的地址
             endpoint_url = endpoint.get('url')
             if endpoint_url is None:

@@ -5,21 +5,15 @@
 
 from __future__ import unicode_literals, absolute_import
 import json
-
-import time
 import logging
-import hmac
-from hashlib import sha256
-import re
 import copy
-from tornado.httputil import parse_qs_bytes
-import settings
-from handlers.base import AuthRequestException, ServerErrorException
-from utils import RedisHelper, utf8, text_type, binary_type
-from urlparse import urlparse, urlunparse
 import traceback
+
+from tornado.httputil import parse_qs_bytes
+
+from handlers.base import AuthRequestException, ServerErrorException
+from utils import utf8, text_type
 from utils import AESCipher
-from copy import deepcopy
 from middleware import BaseMiddleware
 
 logger = logging.getLogger(__name__)

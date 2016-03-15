@@ -198,8 +198,6 @@ class AnalyticsData(object):
 
     @gen.coroutine
     def save(self, database):
-        logger.debug(type(self.request.headers))
-
         yield self.request.save(database, 'request')
         yield self.response.save(database, 'response')
         future = yield database.access_log.insert(self.get_json())

@@ -35,10 +35,10 @@ BUILTIN_ENDPOINTS = [
             'version': 'v1'
         },
         'handlers': [
-            ('/login/?', 'handlers.endpoint.AuthLoginHandler'),
-            ('/logout/?', 'handlers.endpoint.AuthLogoutHandler'),
-            ('/token/?', 'handlers.endpoint.AuthTokenHandler')
-        ],
+            (r'/login/?', 'handlers.endpoint.AuthLoginHandler'),
+            (r'/logout/?', 'handlers.endpoint.AuthLogoutHandler'),
+            (r'/token/?', 'handlers.endpoint.AuthTokenHandler')
+        ]
     }
 ]
 

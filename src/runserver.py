@@ -18,7 +18,7 @@ from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
     MONGO_PASSWORD, MONGO_USERNAME
 from utils import RedisHelper, import_string
 from utils import text_type, binary_type
-from handlers.proxy import BackendAPIHandler
+from handlers.base import BaseHandler
 import settings
 
 logger = logging.getLogger(__name__)
@@ -44,13 +44,14 @@ class Application(web.Application):
         )
 
         self.middleware_list = []
-        self.builtin_endpoints = settings.BUILTIN_ENDPOINTS
-        self._load_middleware()
+        self.builtin_endpoints = {}
 
-        handlers = self._load_builtin_endpoints()
-        handlers.extend(
-            [(r'/.*', BackendAPIHandler)]
-        )
+        self._load_middleware()
+        self._load_builtin_endpoints()
+
+        handlers = [
+            (r'/.*', BaseHandler)
+        ]
 
         web.Application.__init__(self, handlers, **tornado_settings)
 
@@ -58,16 +59,16 @@ class Application(web.Application):
         """
         从 settings.BUILTIN_ENDPOINTS 载入内置的 endpoints
         """
-        handlers = []
-        for endpoint in self.builtin_endpoints:
+        handlers = {}
+        for endpoint in settings.BUILTIN_ENDPOINTS:
             c = endpoint['config']
-            for url, handler_path in endpoint['handlers']:
+            key = '%s/%s' % (c['name'], c['version'])
+            handlers[key] = []
+            for reg_uri, handler_path in endpoint['handlers']:
                 h_class = import_string(handler_path)
-                handlers.append((r'/%s/%s%s' % (c['name'], c['version'], url), h_class))
+                handlers[key].append((reg_uri, h_class))
 
-        logger.debug('builtin_endpoints: \n%s' %
-                     '\n'.join([text_type(h) for h in handlers]))
-        return handlers
+        self.builtin_endpoints = handlers
 
     def _load_middleware(self):
         """

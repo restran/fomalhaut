@@ -35,10 +35,13 @@ class BaseHandler(RequestHandler):
 
         # 请求 client 的相关信息
         self.client = None
+        # 对应的 API Handler, 可能是内置的, 也可能是后端的 API
+        self.real_api_handler = None
         self.analytics = AnalyticsData()
         self.response = {'headers': HTTPHeaders(), 'body': ''}
         # 拷贝一份中间件的列表
         self.middleware_list = copy_list(self.application.middleware_list)
+        self.builtin_endpoints = self.application.builtin_endpoints
 
     def clear_nested_middleware(self, mw_class):
         """
@@ -186,7 +189,7 @@ class BaseHandler(RequestHandler):
 
         yield self._process_response(self, self._write_buffer)
 
-        # 执行完父类的 finish 方法后,就会开始调用 on_finish
+        # 执行完父类的 finish 方法后, 就会开始调用 on_finish
         super(BaseHandler, self).finish(chunk)
 
     def write(self, chunk):
@@ -200,3 +203,29 @@ class BaseHandler(RequestHandler):
         """
         super(BaseHandler, self).on_finish()
         yield self._process_finished(self)
+
+    @gen.coroutine
+    def get(self, *args, **kwargs):
+        if self.real_api_handler is None:
+            self.set_status(404)
+            self.write('404 Not Found')
+        else:
+            handler = self.real_api_handler(self)
+            if not hasattr(handler, 'get'):
+                self.set_status(405)
+                self.write('405 Method Not Allowed')
+            else:
+                yield handler.get(*args, **kwargs)
+
+    @gen.coroutine
+    def post(self, *args, **kwargs):
+        if self.real_api_handler is None:
+            self.set_status(404)
+            self.write('404 Not Found')
+        else:
+            handler = self.real_api_handler(self)
+            if not hasattr(handler, 'post'):
+                self.set_status(405)
+                self.write('405 Method Not Allowed')
+            else:
+                yield handler.post(*args, **kwargs)
