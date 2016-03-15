@@ -168,6 +168,7 @@ class AuthEndpointTest(unittest.TestCase):
             'refresh_token': r.json()['data']['refresh_token']
         }
         logger.debug(json_data)
+
         r = req.post('/token', json=json_data)
         self.assertEqual(r.status_code, 200)
         v = Validator(schema=schema, allow_unknown=True)
@@ -209,6 +210,85 @@ class AuthEndpointTest(unittest.TestCase):
         v = Validator(schema=schema, allow_unknown=True)
         self.assertEqual(v.validate(r.json()), True)
 
+    def test_aes_login_refresh_logout(self):
+        client = APIClient(self.access_key, self.secret_key, self.api_server)
+        req = APIRequest(client, self.endpoint, self.version, encrypt_type='aes')
+
+        r = req.get('/login')
+        print(r.content)
+        self.assertEqual(r.status_code, 405)
+        json_data = {
+            'name': 'name',
+            'password': 'password'
+        }
+        r = req.post('/login', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        schema = {
+            'code': {
+                'type': 'integer',
+                'required': True,
+                'allowed': [APIStatusCode.SUCCESS]
+            },
+            'msg': {
+                'type': 'string',
+                'required': True,
+            },
+            'data': {
+                'type': 'dict',
+                'required': True,
+            }
+        }
+        v = Validator(schema=schema, allow_unknown=True)
+        logger.debug(r.json())
+        logger.debug(v.validate(r.json()))
+        self.assertEqual(v.validate(r.json()), True)
+
+        # refresh_token
+        json_data = {
+            'refresh_token': r.json()['data']['refresh_token']
+        }
+        logger.debug(json_data)
+
+        r = req.post('/token', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        logger.debug(r.json())
+        self.assertEqual(v.validate(r.json()), True)
+
+        # ---------------------
+        json_data = {
+            'test': 'test'
+        }
+
+        auth_req = APIRequest(client, 'test_api_login', 'v1', encrypt_type='aes')
+
+        access_token = r.json()['data']['access_token']
+        ar = auth_req.post('/protected/?access_token=%s' % access_token,
+                           json=json_data)
+        self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        logger.debug(ar.json())
+        self.assertEqual(v.validate(ar.json()), True)
+        # ---------------------
+        # logout
+        json_data = {
+            'access_token': r.json()['data']['access_token']
+        }
+        r = req.post('/logout', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        schema = {
+            'code': {
+                'type': 'integer',
+                'required': True,
+                'allowed': [APIStatusCode.SUCCESS]
+            },
+            'msg': {
+                'type': 'string',
+                'required': True,
+            }
+        }
+        v = Validator(schema=schema, allow_unknown=True)
+        self.assertEqual(v.validate(r.json()), True)
 
 if __name__ == '__main__':
     unittest.main()

@@ -71,6 +71,7 @@ class BackendAPIHandler(BaseHandler):
     @gen.coroutine
     def _do_fetch(self, method):
         forward_url = self.client.request['forward_url']
+        # TODO 执行了 AES 加密请求后, 这里的 forward_url 就为 None
         logger.debug('请求的后端网站 %s' % forward_url)
         logger.debug('原始的 headers %s' % self.request.headers)
         # 清理和处理一下 header

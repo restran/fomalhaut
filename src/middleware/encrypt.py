@@ -11,6 +11,8 @@ import logging
 import hmac
 from hashlib import sha256
 import re
+import copy
+from tornado.httputil import parse_qs_bytes
 import settings
 from handlers.base import AuthRequestException, ServerErrorException
 from utils import RedisHelper, utf8, text_type, binary_type
@@ -46,6 +48,10 @@ class EncryptHandler(BaseMiddleware):
             if encrypted_uri:
                 request.uri = aes_cipher.decrypt(utf8(encrypted_uri))
                 logger.debug('decrypted uri %s' % request.uri)
+                # 因为修改了 uri，需要重新生成 query_arguments
+                request.path, sep, request.query = request.uri.partition('?')
+                request.arguments = parse_qs_bytes(request.query, keep_blank_values=True)
+                request.query_arguments = copy.deepcopy(request.arguments)
 
             encrypted_headers = self.handler.request.headers.get('X-Api-Encrypted-Headers')
 
@@ -64,7 +70,8 @@ class EncryptHandler(BaseMiddleware):
                 logger.debug('解密 body')
                 logger.debug(request.body)
                 request.body = aes_cipher.decrypt(utf8(request.body))
-
+                # 因为修改了 body，需要重新 _parse_body
+                request._parse_body()
                 # 解密完之后不需要重新计算 Content-Length,
                 # 因为请求后端 API 时不带 Content-Length
 
