@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/21
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 import unittest
 from settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
 from handlers.endpoint import APIStatusCode
 from cerberus import Validator
+import requests
 from utils import *
 from tests.api_client import APIClient, APIRequest
 
@@ -293,6 +294,95 @@ class AuthEndpointTest(unittest.TestCase):
         }
         v = Validator(schema=schema, allow_unknown=True)
         self.assertEqual(v.validate(r.json()), True)
+
+
+class ClientPublicAPITest(unittest.TestCase):
+    def setUp(self):
+        self.access_key = 'public'
+        self.secret_key = ''
+        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
+        self.endpoint = 'public'
+        self.version = 'v1'
+
+    def test_post(self):
+        client = APIClient(self.access_key, self.secret_key, self.api_server)
+        req = APIRequest(client, self.endpoint, self.version,
+                         require_hmac=False, require_response_sign=False)
+
+        json_data = {
+            'a': 1,
+            'b': 'test string',
+            'c': '中文'
+        }
+
+        body = json.dumps(json_data, ensure_ascii=False)
+        r = req.post('/resource/', json=json_data)
+
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(utf8(body), utf8(r.content))
+
+    def test_post_img(self):
+        client = APIClient(self.access_key, self.secret_key, self.api_server)
+        req = APIRequest(client, self.endpoint, self.version,
+                         require_hmac=False, require_response_sign=False)
+
+        with open('img.jpg', 'rb') as f:
+            body = f.read()
+            r = req.post('/resource/', data=body)
+
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(utf8(r.content), utf8(body))
+
+    def test_get(self):
+        client = APIClient(self.access_key, self.secret_key, self.api_server)
+        req = APIRequest(client, self.endpoint, self.version,
+                         require_hmac=False, require_response_sign=False)
+
+        r = req.get('/resource/')
+
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(utf8('get'), utf8(r.content))
+
+
+class RawPublicAPITest(unittest.TestCase):
+    """
+    不通过 API Client 来访问, 没有带 API 网关定义的特殊 Header 来访问 public API
+    """
+
+    def setUp(self):
+        self.access_key = 'public'
+        self.secret_key = ''
+        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
+        self.endpoint = 'public'
+        self.version = 'v1'
+
+    def test_post(self):
+        json_data = {
+            'a': 1,
+            'b': 'test string',
+            'c': '中文'
+        }
+
+        url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
+        r = requests.post(url, json=encoded_dict(json_data))
+        self.assertEqual(r.status_code, 200)
+
+    def test_post_img(self):
+        url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
+        with open('img.jpg', 'rb') as f:
+            body = f.read()
+            r = requests.post(url, data=body)
+
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(utf8(r.content), utf8(body))
+
+    def test_get(self):
+        url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
+        r = requests.get(url)
+
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(utf8('get'), utf8(r.content))
+
 
 if __name__ == '__main__':
     unittest.main()

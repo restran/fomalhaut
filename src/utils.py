@@ -10,12 +10,11 @@ import logging
 import os
 import uuid
 import json
-import sys
-import types
 from copy import copy
 import base64
 import hashlib
 import random
+from six import text_type, binary_type
 
 from Crypto import Random
 from Crypto.Cipher import AES
@@ -25,28 +24,8 @@ import settings
 
 logger = logging.getLogger(__name__)
 
-
 # 当前进程的id
 PID = os.getpid()
-
-PY2 = sys.version_info[0] == 2
-PY3 = sys.version_info[0] == 3
-
-if PY3:
-    string_types = str,
-    integer_types = int,
-    class_types = type,
-    text_type = str
-    binary_type = bytes
-    # MAXSIZE = sys.maxsize
-    from urllib.parse import urlencode
-else:
-    string_types = basestring,
-    integer_types = (int, long)
-    class_types = (type, types.ClassType)
-    text_type = unicode
-    binary_type = str
-    from urllib import urlencode
 
 # 拷贝 list
 copy_list = (lambda lb: copy(lb) if lb else [])
@@ -90,10 +69,16 @@ def encoded_dict(in_dict):
     :return:
     """
     out_dict = {}
-    for k, v in in_dict.iteritems():
-        if isinstance(v, unicode):
+    for k, v in in_dict.items():
+        if isinstance(k, text_type):
+            k = k.encode('utf8')
+        elif isinstance(k, binary_type):
+            # Must be encoded in UTF-8
+            k.decode('utf8')
+
+        if isinstance(v, text_type):
             v = v.encode('utf8')
-        elif isinstance(v, str):
+        elif isinstance(v, binary_type):
             # Must be encoded in UTF-8
             v.decode('utf8')
         out_dict[k] = v

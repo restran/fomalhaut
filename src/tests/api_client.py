@@ -10,8 +10,10 @@ import random
 import time
 import hmac
 from hashlib import sha256, sha1
-from utils import utf8, encoded_dict, text_type, binary_type, AESCipher, urlencode
-from urlparse import urlparse, urlunparse
+from utils import utf8, encoded_dict, text_type, binary_type, AESCipher
+# pycharm 无法识别, 会标记错误, 原因不明
+from six.moves.urllib.parse import urlparse, urlunparse
+from tornado.httputil import urlencode
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
 import requests
 
@@ -46,13 +48,16 @@ class APIClient(object):
 class APIRequest(object):
     # TODO 重新整理代码, 将签名和加解密部分分离出来
 
-    def __init__(self, client, endpoint, version='', encrypt_type='raw', *args, **kwargs):
+    def __init__(self, client, endpoint, version='', encrypt_type='raw',
+                 require_hmac=True, require_response_sign=True, *args, **kwargs):
         self.access_key = client.access_key
         self.secret_key = client.secret_key
-        self.api_server = client.api_server
-        self.endpoint = endpoint
-        self.version = version
+        self.api_server = client.api_server.strip()
+        self.endpoint = endpoint.strip().strip('/')
+        self.version = version.strip().strip('/')
         self.encrypt_type = encrypt_type
+        self.require_hmac = require_hmac
+        self.require_response_sign = require_response_sign
         self.request_data = RequestObject()
 
         self.gateway_error_status_code = client.gateway_error_status_code
@@ -66,8 +71,7 @@ class APIRequest(object):
         method = method.upper()
         params = encoded_dict(params)
         logger.debug(uri)
-        url = '/'.join([self.api_server.strip(), self.endpoint.strip().strip('/'),
-                        self.version.strip().strip('/')]) + uri.strip()
+        url = '/'.join([self.api_server, self.endpoint, self.version]) + uri.strip()
         logger.debug(url)
         url_parsed = urlparse(url)
         enc_params = urlencode(params)
@@ -115,6 +119,10 @@ class APIRequest(object):
             'X-Api-Encrypt-Type': text_type(self.encrypt_type)
         }
 
+        # 检查是否需要返回结果的签名
+        if self.require_response_sign:
+            headers['X-Api-Require-Response-Signature'] = 'true'
+
         return headers
 
     def encrypt_data(self):
@@ -126,11 +134,12 @@ class APIRequest(object):
             'X-Api-Encrypted-Headers': aes_cipher.encrypt(utf8(headers_str)),
             'X-Api-Encrypted-Uri': aes_cipher.encrypt(utf8(self.request_data.uri))
         }
-        self.request_data.uri = '/?_t=%d&_nonce=%s' % \
-                                (int(time.time()), text_type(random.random()))
+        self.request_data.uri = '/%s/%s/?_t=%d&_nonce=%s' % \
+                                (self.endpoint, self.version,
+                                 int(time.time()), text_type(random.random()))
 
         # 设置一个新的 url
-        url = self.api_server.strip() + self.request_data.uri
+        url = self.api_server + self.request_data.uri
 
         if self.request_data.body is not None and len(self.request_data.body) > 0:
             self.request_data.body = aes_cipher.encrypt(utf8(self.request_data.body))
@@ -166,8 +175,10 @@ class APIRequest(object):
             url = self.encrypt_data()
 
         self.request_data.headers.update(self.get_auth_headers())
-        signature = self.signature_request()
-        self.request_data.headers['X-Api-Signature'] = signature
+        # 需要对请求的内容进行 hmac 签名
+        if self.require_hmac:
+            signature = self.signature_request()
+            self.request_data.headers['X-Api-Signature'] = signature
 
         r = requests.get(url, headers=self.request_data.headers, **kwargs)
         logger.debug(r.status_code)
@@ -190,8 +201,12 @@ class APIRequest(object):
             url = self.encrypt_data()
         self.request_data.headers.update(self.get_auth_headers())
         logger.debug(self.request_data.headers)
-        signature = self.signature_request()
-        self.request_data.headers['X-Api-Signature'] = signature
+
+        # 需要对请求的内容进行 hmac 签名
+        if self.require_hmac:
+            signature = self.signature_request()
+            self.request_data.headers['X-Api-Signature'] = signature
+
         r = requests.post(url, headers=self.request_data.headers,
                           data=utf8(self.request_data.body), **kwargs)
 
@@ -287,6 +302,10 @@ class APIRequest(object):
         return signature
 
     def check_response(self, response):
+        # 不需要检查返回的签名就直接返回
+        if not self.require_response_sign:
+            return True
+
         logger.debug(response.headers)
         try:
             timestamp = int(response.headers.get('X-Api-Timestamp'))

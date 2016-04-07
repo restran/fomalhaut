@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2016/02/21
 from __future__ import unicode_literals, absolute_import
+
 import base64
 import json
 import logging
@@ -44,9 +45,9 @@ class AuthAccessTokenHandler(BaseMiddleware):
                 json_str = json.dumps(token_info['user_info'], ensure_ascii=False)
                 # 用户信息使用 json 存储，并编码为 base64
                 self.handler.request.headers['X-Api-User-Json'] = base64.b64encode(json_str.encode('utf8'))
-            except Exception, e:
+            except Exception as e:
                 logger.error('设置 X-Api-User-Json 失败')
-                logger.error(e.message)
+                logger.error(e)
                 logger.error(traceback.format_exc())
         else:
             logger.info('没有获取到用户信息，不允许访问')

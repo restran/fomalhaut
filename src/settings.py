@@ -21,7 +21,8 @@ DEBUG = True
 # 中间件会按顺序执行
 MIDDLEWARE_CLASSES = [
     'middleware.analytics.AnalyticsHandler',
-    'middleware.auth.AuthenticateHandler',
+    'middleware.auth.PrepareAuthHandler',
+    'middleware.auth.HMACAuthenticateHandler',
     'middleware.encrypt.EncryptHandler',
     'middleware.auth.ParseEndpointHandler',
     'middleware.token.AuthAccessTokenHandler',
@@ -87,6 +88,11 @@ ANALYTICS_LOG_REDIS_EXPIRE_SECONDS = 30 * 60
 ACCESS_LOG_HEADERS_MAX_LENGTH = 50 * 1024
 # 最大的 body, 超过的部分会被截断
 ACCESS_LOG_BODY_MAX_LENGTH = 500 * 1024
+
+# 当访问请求没有设置 access_key 时, 将其设置为默认的 App 的 access_key
+# 需要根据访问控制台上配置的 App 的 access_key 来设置
+# 这样的请求, 一般是允许公开访问的 API 请求
+DEFAULT_PUBLIC_APP_ACCESS_KEY = 'public'
 
 # 基础配置在 redis 中的 key
 # BASE_CONFIG_REDIS_KEY = 'base_config'

@@ -10,7 +10,8 @@ from hashlib import sha256, sha1
 import re
 import random
 import traceback
-from urlparse import urlparse
+# pycharm 无法识别, 会标记错误, 原因不明
+from six.moves.urllib.parse import urlparse
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
 from utils import RedisHelper, utf8, text_type
@@ -80,6 +81,10 @@ class Client(object):
                         'type': 'boolean',
                         'required': True
                     },
+                    'enable_hmac': {
+                        'type': 'boolean',
+                        'required': True
+                    },
                     'acl_rules': {
                         'type': 'list',
                         'required': True,
@@ -101,7 +106,8 @@ class Client(object):
     }
 
     def __init__(self, request):
-        self.access_key = request.headers.get('X-Api-Access-Key')
+        self.access_key = request.headers.get(
+            'X-Api-Access-Key', settings.DEFAULT_PUBLIC_APP_ACCESS_KEY)
         self.secret_key = None
         logger.debug(self.access_key)
         self.config = {}
@@ -134,7 +140,7 @@ class Client(object):
         self.config = config_data
 
 
-class HMACAuthHandler(object):
+class HMACHandler(object):
     def __init__(self, client):
         self.client = client
 
@@ -247,29 +253,64 @@ class HMACAuthHandler(object):
             raise AuthRequestException('Invalid Signature')
 
 
-class AuthenticateHandler(BaseMiddleware):
+class PrepareAuthHandler(BaseMiddleware):
     """
-    对访问请求进行鉴权
+    获取 client 和 endpoint
     """
 
     def process_request(self, *args, **kwargs):
         logger.debug('process_request')
         self.handler.client = Client(self.handler.request)
-        auth_handler = HMACAuthHandler(self.handler.client)
-        # logger.debug(self.handler.request.uri)
-        # logger.debug(dict(self.handler.request.headers))
-        # logger.debug(self.handler.request.body)
-        auth_handler.auth_request(self.handler.request)
+
+        # 解析 uri, 获取该请求对应的 endpoint
+        try:
+            _, req_endpoint, version, uri = self.handler.request.uri.split('/', 3)
+        except ValueError:
+            raise AuthRequestException('Invalid Request Uri, Fail to Get Endpoint and Version')
+
+        endpoints = self.handler.client.config.get('endpoints', {})
+        endpoint = endpoints.get('%s:%s' % (req_endpoint, version))
+        if endpoint is None:
+            raise AuthRequestException('No Permission to Access %s/%s' % (req_endpoint, version))
+
+        if not endpoint.get('enable', True):
+            raise AuthRequestException('Disabled Endpoint')
+
+        self.handler.client.request = {
+            'endpoint': endpoint,
+        }
+
+
+class HMACAuthenticateHandler(BaseMiddleware):
+    def process_request(self, *args, **kwargs):
+        """
+        对访问请求进行HMAC签名校验
+        """
+        logger.debug('process_request')
+        # self.handler.client = Client(self.handler.request)
+        endpoint = self.handler.client.request['endpoint']
+        # 判断是否需要进行 HMAC 签名校验
+        if endpoint.get('enable_hmac', True):
+            auth_handler = HMACHandler(self.handler.client)
+            auth_handler.auth_request(self.handler.request)
 
     def process_response(self, *args, **kwargs):
+        """
+        对响应结果进行HMAC签名校验
+        """
         logger.debug('process_response')
-        auth_handler = HMACAuthHandler(self.handler.client)
+        # 判断是否需要对返回的数据进行 HMAC 签名校验
+        require_res_sign = self.handler.request.headers.get('X-Api-Require-Response-Signature')
 
+        if require_res_sign is None:
+            return
+
+        auth_handler = HMACHandler(self.handler.client)
         headers = {
             'X-Api-Timestamp': text_type(int(time.time())),
             'X-Api-Nonce': text_type(random.random()),
         }
-        for k, v in headers.iteritems():
+        for k, v in headers.items():
             self.handler.set_header(k, v)
 
         response_body = b''.join(self.handler.get_write_buffer())
@@ -290,7 +331,7 @@ class AuthenticateHandler(BaseMiddleware):
 
 class ParseEndpointHandler(BaseMiddleware):
     """
-    解析出需要访问的 Endpoint
+    解析出需要访问的 Forward Url
     """
 
     def _parse_uri(self, client):
@@ -304,13 +345,7 @@ class ParseEndpointHandler(BaseMiddleware):
         except ValueError:
             raise AuthRequestException('Invalid Request Uri, Fail to Get Endpoint and Version')
 
-        endpoints = client.config.get('endpoints', {})
-        endpoint = endpoints.get('%s:%s' % (req_endpoint, version))
-        if endpoint is None:
-            raise AuthRequestException('No Permission to Access %s' % req_endpoint)
-
-        if not endpoint.get('enable', True):
-            raise AuthRequestException('Disabled Endpoint')
+        endpoint = self.handler.client.request['endpoint']
 
         if not uri.startswith('/'):
             uri = '/' + uri
@@ -348,14 +383,8 @@ class ParseEndpointHandler(BaseMiddleware):
             else:
                 forward_url = endpoint_url + uri
 
-        request_data = {
-            'endpoint': endpoint,
-            'uri': uri,
-            'forward_url': forward_url,
-        }
-
-        logger.debug(request_data)
-        return request_data
+        self.handler.client.request['uri'] = uri
+        self.handler.client.request['forward_url'] = forward_url
 
     def _acl_filter(self):
         """
@@ -386,7 +415,7 @@ class ParseEndpointHandler(BaseMiddleware):
 
     def process_request(self, *args, **kwargs):
         logger.debug('process_request')
-        # 解析 uri,获取该请求实际要转发的地址
-        self.handler.client.request = self._parse_uri(self.handler.client)
+        # 解析 uri, 获取该请求实际要转发的地址
+        self._parse_uri(self.handler.client)
         # 进行 acl 过滤
         self._acl_filter()

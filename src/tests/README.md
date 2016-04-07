@@ -72,3 +72,38 @@ Redis 中存储的数据如下所示:
     "id": 3
 }
 ```
+
+key: `config:public`
+
+```json
+{
+    "access_key": "public",
+    "login_auth_url": "",
+    "access_token_ex": 864000,
+    "name": "public-app",
+    "enable": true,
+    "secret_key": "a5f45165bc1db7b4b32d98705f114a43247a63e0",
+    "endpoints": {
+        "public:v1": {
+            "unique_name": "public-api",
+            "enable": true,
+            "require_login": false,
+            "netloc": "127.0.0.1:8001",
+            "memo": "",
+            "enable_hmac": false,
+            "enable_acl": false,
+            "is_builtin": false,
+            "id": 5,
+            "name": "public",
+            "url": "http://127.0.0.1:8001",
+            "acl_rules": [],
+            "async_http_connect_timeout": 20,
+            "version": "v1",
+            "async_http_request_timeout": 20
+        }
+    },
+    "memo": "",
+    "refresh_token_ex": 1728000,
+    "id": 5
+}
+```

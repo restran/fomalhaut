@@ -2,19 +2,15 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/21
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 
 import tornado.httpserver
 import tornado.ioloop
-import tornado.options
 import tornado.web
-import tornado.gen
-import tornado.httpclient
-import tornado.concurrent
-import tornado.ioloop
 import logging
 import json
 from six import binary_type
+import tornado
 
 from tornado.options import define, options
 

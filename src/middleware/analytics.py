@@ -11,7 +11,7 @@ from middleware.exceptions import *
 from middleware import BaseMiddleware
 from tornado import gen
 import motor
-from cStringIO import StringIO
+from six import StringIO
 import hashlib
 from datetime import datetime
 
@@ -74,7 +74,7 @@ class HTTPData(object):
                     'text/plain', True)
                 logger.debug(self.headers_id)
 
-        if self.body is not None and self.body != '':
+        if self.body is not None and len(self.body) > 0:
             # 内容过长, 截断
             if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
                 content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]

@@ -8,7 +8,6 @@ import json
 import logging
 import copy
 import traceback
-
 from tornado.httputil import parse_qs_bytes
 
 from handlers.base import AuthRequestException, ServerErrorException
@@ -52,13 +51,13 @@ class EncryptHandler(BaseMiddleware):
             if encrypted_headers:
                 headers_str = aes_cipher.decrypt(utf8(encrypted_headers))
                 headers = dict(json.loads(headers_str))
-                logger.debug('raw headers %s' % request.headers)
-                for k, v in headers.iteritems():
+                # logger.debug('raw headers %s' % request.headers)
+                for k, v in headers.items():
                     # 要全部使用 text_type，否则会出现有的为 str，有的为 unicode
                     # 导致422错误
                     request.headers[text_type(k)] = text_type(v)
 
-                logger.debug('decrypted headers %s' % request.headers)
+                # logger.debug('decrypted headers %s' % request.headers)
 
             if request.body and len(request.body) > 0:
                 logger.debug('解密 body')

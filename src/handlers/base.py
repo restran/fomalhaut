@@ -94,7 +94,7 @@ class BaseHandler(RequestHandler):
         ex = kwargs['exc_info'][1]
         # any 表示只要有一个为 true 就可以
         if any(isinstance(ex, c) for c in [APIGatewayException]):
-            logger.debug('api exception')
+            logger.debug('api exception: %s' % ex)
             # 根据异常,设置相应的 result_code
             if isinstance(ex, AuthRequestException):
                 self.analytics.result_code = ResultCode.BAD_AUTH_REQUEST
