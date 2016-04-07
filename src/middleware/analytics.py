@@ -247,7 +247,6 @@ class AnalyticsHandler(BaseMiddleware):
         analytics.request.body = request.body
 
         client = self.handler.client
-        # 如果 client 为空表示未能通过 HMAC 签名鉴权
         if client is not None:
             analytics.client_name = client.config.get('name')
             analytics.client_id = client.config.get('id')
@@ -258,12 +257,12 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.is_builtin = endpoint.get('is_builtin', False)
             analytics.forward_url = client.request.get('forward_url')
 
-            response = self.handler.response
-            response_headers = response['headers']
-            response_body = response['body']
-            analytics.response.content_type = response_headers.get('Content-Type', '')
-            analytics.response.headers = response_headers
-            analytics.response.body = response_body
+        response = self.handler.response
+        response_headers = response['headers']
+        response_body = response['body']
+        analytics.response.content_type = response_headers.get('Content-Type', '')
+        analytics.response.headers = response_headers
+        analytics.response.body = response_body
 
         db = self.handler.settings['db']
         # 将统计数据存储在 MongoDB 中

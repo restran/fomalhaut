@@ -178,7 +178,7 @@ class BaseHandler(RequestHandler):
     def prepare(self):
         super(BaseHandler, self).prepare()
 
-        logger.info('base prepare')
+        logger.debug('base prepare')
         yield self._process_request(self)
 
     @gen.coroutine

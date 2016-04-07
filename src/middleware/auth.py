@@ -301,29 +301,30 @@ class HMACAuthenticateHandler(BaseMiddleware):
         logger.debug('process_response')
         # 判断是否需要对返回的数据进行 HMAC 签名校验
         require_res_sign = self.handler.request.headers.get('X-Api-Require-Response-Signature')
-
-        if require_res_sign is None:
-            return
-
-        auth_handler = HMACHandler(self.handler.client)
-        headers = {
-            'X-Api-Timestamp': text_type(int(time.time())),
-            'X-Api-Nonce': text_type(random.random()),
-        }
-        for k, v in headers.items():
-            self.handler.set_header(k, v)
-
         response_body = b''.join(self.handler.get_write_buffer())
+
+        # 执行签名
+        if require_res_sign is not None:
+            auth_handler = HMACHandler(self.handler.client)
+            headers = {
+                'X-Api-Timestamp': text_type(int(time.time())),
+                'X-Api-Nonce': text_type(random.random()),
+            }
+            for k, v in headers.items():
+                self.handler.set_header(k, v)
+
+            response_headers = self.handler.get_response_headers()
+            # logger.debug(response_body.decode('utf-8'))
+            # logger.debug(dict(self.handler.get_response_headers()))
+            signature = auth_handler.signature_response(
+                response_headers,
+                self.handler.request, response_body)
+
+            # 对返回结果进行签名
+            self.handler.set_header('X-Api-Signature', signature)
+
+        # 获取最新的 headers
         response_headers = self.handler.get_response_headers()
-        # logger.debug(response_body.decode('utf-8'))
-        # logger.debug(dict(self.handler.get_response_headers()))
-        signature = auth_handler.signature_response(
-            response_headers,
-            self.handler.request, response_body)
-
-        # 对返回结果进行签名
-        self.handler.set_header('X-Api-Signature', signature)
-
         self.handler.response['headers'] = response_headers
         self.handler.response['body'] = response_body
         logger.debug('process_response_done')

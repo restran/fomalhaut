@@ -1,23 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/19
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 
 import logging
 
-import tornado.httpserver
-import tornado.ioloop
-import tornado.options
-import tornado.web
-import tornado.gen
-import tornado.httpclient
+from tornado import httpserver, ioloop, web
 from tornado.options import define, options
-from tornado import web
 import motor
 from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
     MONGO_PASSWORD, MONGO_USERNAME
-from utils import RedisHelper, import_string
-from utils import text_type, binary_type
+from utils import RedisHelper, import_string, text_type, binary_type
 from handlers.base import BaseHandler
 import settings
 
@@ -25,24 +18,15 @@ logger = logging.getLogger(__name__)
 
 define("host", default=settings.HOST, help="run on the given host", type=str)
 define("port", default=settings.PORT, help="run on the given port", type=int)
+define("num_processes", default=settings.NUM_PROCESSES, help="process num", type=int)
 
 
 class Application(web.Application):
     def __init__(self):
-        # 创建一个数据库连接池
-        self.db_client = motor.motor_tornado.MotorClient(
-            MONGO_HOST, MONGO_PORT, max_pool_size=200)
-        # 验证数据库用户名和密码
-        self.db_client[MONGO_DBNAME].authenticate(
-            MONGO_USERNAME, MONGO_PASSWORD, mechanism='SCRAM-SHA-1')
-        self.database = self.db_client[MONGO_DBNAME]
-
-        tornado_settings = dict(
-            # autoreload=True, # debug 模式会自动 autoreload
-            debug=settings.DEBUG,
-            db=self.database
-        )
-
+        tornado_settings = {
+            'autoreload': settings.AUTO_RELOAD,
+            'debug': settings.DEBUG
+        }
         self.middleware_list = []
         self.builtin_endpoints = {}
 
@@ -53,7 +37,7 @@ class Application(web.Application):
             (r'/.*', BaseHandler)
         ]
 
-        web.Application.__init__(self, handlers, **tornado_settings)
+        super(Application, self).__init__(handlers, **tornado_settings)
 
     def _load_builtin_endpoints(self):
         """
@@ -83,9 +67,6 @@ class Application(web.Application):
                      '\n'.join([text_type(m) for m in self.middleware_list]))
 
 
-app = Application()
-
-
 def main():
     # 启动 tornado 之前，先测试 redis 是否能正常工作
     r = RedisHelper()
@@ -95,13 +76,33 @@ def main():
     # options.logging 不能是 Unicode
     options.logging = binary_type(settings.LOGGING_LEVEL)
     # parse_command_line 的时候将 logging 的根级别设置为 info
-    tornado.options.parse_command_line()
+    options.parse_command_line()
 
-    http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
-    http_server.listen(options.port, options.host)
+    app = Application()
+    server = httpserver.HTTPServer(app, xheaders=True)
+
+    # 如果开启了 autoreload 会出现错误
+    # You cannot call IOLoop.instance() before calling start_processes()
+    if settings.AUTO_RELOAD:
+        server.listen(options.port, options.host)
+    else:
+        server.bind(options.port, options.host)
+        server.start(options.num_processes)
 
     logger.info('api gateway server is running on %s:%s' % (options.host, options.port))
-    tornado.ioloop.IOLoop.instance().start()
+
+    # 因为 motor 基于 IOLoop.instance() 所以需要等创建多进程后才创建
+    # 否则会出现错误 You cannot call IOLoop.instance() before calling start_processes()
+    # 创建一个数据库连接池
+    db_client = motor.motor_tornado.MotorClient(
+        MONGO_HOST, MONGO_PORT, max_pool_size=200)
+    # 验证数据库用户名和密码
+    db_client[MONGO_DBNAME].authenticate(
+        MONGO_USERNAME, MONGO_PASSWORD, mechanism='SCRAM-SHA-1')
+    database = db_client[MONGO_DBNAME]
+    app.settings['db'] = database
+
+    ioloop.IOLoop.instance().start()
 
 
 if __name__ == "__main__":

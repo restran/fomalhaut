@@ -2,21 +2,24 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/19
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 
 import os
 import logging.config
 
 # 当前目录所在路径
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
-
+# 日志所在目录
 LOG_PATH = os.path.join(BASE_PATH, 'logs')
 
 HOST = '127.0.0.1'
 PORT = 6500
-
+# 如果设置为 0 的话, 默认会让进程数等于 CPU 的核心数量
+NUM_PROCESSES = 0
 # 是否调试模式
 DEBUG = True
+# 代码修改时, 是否自动重启
+AUTO_RELOAD = True
 
 # 中间件会按顺序执行
 MIDDLEWARE_CLASSES = [
