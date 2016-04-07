@@ -56,13 +56,14 @@ def utf8(value):
     """Get the UTF8-encoded version of a value."""
     if not isinstance(value, binary_type) and not isinstance(value, text_type):
         value = binary_type(value)
+
     if isinstance(value, text_type):
         return value.encode('utf-8')
     else:
         return value
 
 
-def encoded_dict(in_dict):
+def utf8_encoded_dict(in_dict):
     """
     使用 utf-8 重新编码字典
     :param in_dict:
@@ -70,18 +71,7 @@ def encoded_dict(in_dict):
     """
     out_dict = {}
     for k, v in in_dict.items():
-        if isinstance(k, text_type):
-            k = k.encode('utf8')
-        elif isinstance(k, binary_type):
-            # Must be encoded in UTF-8
-            k.decode('utf8')
-
-        if isinstance(v, text_type):
-            v = v.encode('utf8')
-        elif isinstance(v, binary_type):
-            # Must be encoded in UTF-8
-            v.decode('utf8')
-        out_dict[k] = v
+        out_dict[utf8(k)] = utf8(v)
     return out_dict
 
 

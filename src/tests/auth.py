@@ -364,7 +364,7 @@ class RawPublicAPITest(unittest.TestCase):
         }
 
         url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
-        r = requests.post(url, json=encoded_dict(json_data))
+        r = requests.post(url, json=utf8_encoded_dict(json_data))
         self.assertEqual(r.status_code, 200)
 
     def test_post_img(self):

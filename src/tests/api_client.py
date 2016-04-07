@@ -10,7 +10,7 @@ import random
 import time
 import hmac
 from hashlib import sha256, sha1
-from utils import utf8, encoded_dict, text_type, binary_type, AESCipher
+from utils import utf8, utf8_encoded_dict, text_type, binary_type, AESCipher
 # pycharm 无法识别, 会标记错误, 原因不明
 from six.moves.urllib.parse import urlparse, urlunparse
 from tornado.httputil import urlencode
@@ -69,7 +69,7 @@ class APIRequest(object):
             raise TypeError('params should be dict')
 
         method = method.upper()
-        params = encoded_dict(params)
+        params = utf8_encoded_dict(params)
         logger.debug(uri)
         url = '/'.join([self.api_server, self.endpoint, self.version]) + uri.strip()
         logger.debug(url)
