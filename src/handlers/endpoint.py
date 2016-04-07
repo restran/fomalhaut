@@ -7,6 +7,7 @@ from handlers.base import BaseHandler, AuthRequestException
 import cerberus
 from tornado.concurrent import is_future
 import logging
+from functools import wraps
 from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
 import sys
 from settings import GATEWAY_ERROR_STATUS_CODE, \
@@ -36,7 +37,8 @@ class Validator(object):
         :return:
         """
 
-        def _validate(rh_method):
+        def _validate(func):
+            @wraps(func)
             @gen.coroutine
             def _wrapper(self, *args, **kwargs):
                 try:
@@ -58,7 +60,7 @@ class Validator(object):
                         self.fail(msg='提交的数据格式不正确')
                     else:
                         # Call the request_handler method
-                        ret = rh_method(self, *args, **kwargs)
+                        ret = func(self, *args, **kwargs)
                         if is_future(ret):
                             yield ret
                             # 如果 rh_method 用了 coroutine，并且这个函数中抛出了异常，
