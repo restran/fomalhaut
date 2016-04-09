@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2016/02/22
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 
 import traceback
 import logging

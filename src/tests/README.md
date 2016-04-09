@@ -5,7 +5,7 @@
 
 Redis 中存储的数据如下所示:
 
-    key: `config:abcd`
+key: `config:abcd`
 
 ```json
 {

@@ -2,27 +2,18 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/19
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 
 import logging
 import traceback
-
-import tornado.httpserver
-import tornado.ioloop
-import tornado.options
-import tornado.web
-import tornado.gen
-import tornado.httpclient
-from tornado.httputil import HTTPHeaders
-from tornado.httpclient import HTTPRequest
-from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
-
 from tornado import gen
+from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
+from tornado.httpclient import HTTPRequest, HTTPError
+from tornado.httputil import HTTPHeaders
 
+import settings
 from middleware.analytics import ResultCode
 from utils import text_type
-import settings
-from handlers.base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +105,7 @@ class BackendAPIHandler(object):
                             request_timeout=async_http_request_timeout,
                             follow_redirects=False))
             self._on_proxy(response)
-        except tornado.httpclient.HTTPError as x:
+        except HTTPError as x:
             if hasattr(x, 'response') and x.response:
                 self._on_proxy(x.response)
             else:
@@ -128,7 +119,7 @@ class BackendAPIHandler(object):
     def _on_proxy(self, response):
         forward_url = self.client.request['forward_url']
         if response.error and not isinstance(
-                response.error, tornado.httpclient.HTTPError):
+                response.error, HTTPError):
             self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
             logger.error(u'proxy failed for %s, error: %s' % (forward_url, response.error))
             return

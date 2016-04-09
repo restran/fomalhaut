@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2016/02/21
 from __future__ import unicode_literals, absolute_import
+
+import json
+import logging
+import sys
+import time
+import traceback
+from functools import wraps
+
+import cerberus
+from tornado import gen
+from tornado.concurrent import is_future
+from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
 from tornado.httpclient import HTTPRequest
 
-from handlers.base import BaseHandler, AuthRequestException
-import cerberus
-from tornado.concurrent import is_future
-import logging
-from functools import wraps
-from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
-import sys
+from handlers.base import AuthRequestException
 from settings import GATEWAY_ERROR_STATUS_CODE, \
     ASYNC_HTTP_CONNECT_TIMEOUT, ASYNC_HTTP_REQUEST_TIMEOUT
-from tornado import gen
-import traceback
-import uuid
 from utils import RedisHelper
-import json
-import time
 
 logger = logging.getLogger(__name__)
 

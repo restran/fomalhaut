@@ -5,14 +5,14 @@
 from __future__ import unicode_literals, absolute_import
 
 import time
-from gridfs.errors import FileExists
 from settings import ACCESS_LOG_BODY_MAX_LENGTH, ACCESS_LOG_HEADERS_MAX_LENGTH
 from middleware.exceptions import *
 from middleware import BaseMiddleware
 from tornado import gen
 import motor
-from six import StringIO
+from six import BytesIO
 import hashlib
+from utils import utf8
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class HTTPData(object):
     @gen.coroutine
     def write_file(self, db, collection, data, content_type='', hash_id=False):
         fs = motor.motor_tornado.MotorGridFS(db, collection=collection)
-        content = StringIO(data)
+        content = BytesIO(utf8(data))
         if not hash_id:
             _id = yield fs.put(content, content_type=content_type)
             logger.debug(_id)

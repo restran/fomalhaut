@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2015/12/19
 
-from __future__ import unicode_literals
+from __future__ import unicode_literals, absolute_import
 
 import logging
 import traceback
@@ -13,7 +13,6 @@ from tornado.web import RequestHandler
 from tornado.concurrent import is_future
 from tornado import gen
 from tornado.httputil import HTTPHeaders
-from tornado.web import HTTPError
 from middleware.analytics import AnalyticsData
 from utils import text_type, copy_list
 
