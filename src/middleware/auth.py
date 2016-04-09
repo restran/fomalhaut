@@ -301,7 +301,6 @@ class HMACAuthenticateHandler(BaseMiddleware):
         logger.debug('process_response')
         # 判断是否需要对返回的数据进行 HMAC 签名校验
         require_res_sign = self.handler.request.headers.get('X-Api-Require-Response-Signature')
-        response_body = b''.join(self.handler.get_write_buffer())
 
         # 执行签名
         if require_res_sign is not None:
@@ -314,6 +313,7 @@ class HMACAuthenticateHandler(BaseMiddleware):
                 self.handler.set_header(k, v)
 
             response_headers = self.handler.get_response_headers()
+            response_body = b''.join(self.handler.get_write_buffer())
             # logger.debug(response_body.decode('utf-8'))
             # logger.debug(dict(self.handler.get_response_headers()))
             signature = auth_handler.signature_response(
@@ -323,10 +323,6 @@ class HMACAuthenticateHandler(BaseMiddleware):
             # 对返回结果进行签名
             self.handler.set_header('X-Api-Signature', signature)
 
-        # 获取最新的 headers
-        response_headers = self.handler.get_response_headers()
-        self.handler.response['headers'] = response_headers
-        self.handler.response['body'] = response_body
         logger.debug('process_response_done')
 
 

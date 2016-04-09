@@ -220,16 +220,23 @@ class AnalyticsHandler(BaseMiddleware):
         x_real_ip = request.headers.get('X-Real-Ip')
         remote_ip = request.remote_ip if not x_real_ip else x_real_ip
         analytics.ip = remote_ip
-        # analytics.request.uri = request.uri
-        # analytics.request.method = request.method
-        # analytics.request.content_type = request.headers.get('Content-Type', '')
-        # analytics.request.headers = request.headers
-        # analytics.request.body = request.body
+
+    def process_response(self, *args, **kwargs):
+        """
+        在结果返回前, 先记录响应数据
+        """
+        logger.debug('process_response')
+        response_headers = self.handler.get_response_headers()
+        response_body = b''.join(self.handler.get_write_buffer())
+        analytics = self.handler.analytics
+        analytics.response.content_type = response_headers.get('Content-Type', '')
+        analytics.response.headers = response_headers
+        analytics.response.body = response_body
 
     @gen.coroutine
     def process_finished(self):
         """
-        结果已经返回,处理访问日志
+        结果已经返回, 处理访问日志
         :return:
         """
         logger.debug('process_finished')
@@ -256,13 +263,6 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.version = endpoint.get('version')
             analytics.is_builtin = endpoint.get('is_builtin', False)
             analytics.forward_url = client.request.get('forward_url')
-
-        response = self.handler.response
-        response_headers = response['headers']
-        response_body = response['body']
-        analytics.response.content_type = response_headers.get('Content-Type', '')
-        analytics.response.headers = response_headers
-        analytics.response.body = response_body
 
         db = self.handler.settings['db']
         # 将统计数据存储在 MongoDB 中

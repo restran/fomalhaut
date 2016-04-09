@@ -38,7 +38,6 @@ class BaseHandler(RequestHandler):
         # 对应的 API Handler, 可能是内置的, 也可能是后端的 API
         self.real_api_handler = None
         self.analytics = AnalyticsData()
-        self.response = {'headers': HTTPHeaders(), 'body': ''}
         # 拷贝一份中间件的列表
         self.middleware_list = copy_list(self.application.middleware_list)
         self.builtin_endpoints = self.application.builtin_endpoints

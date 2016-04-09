@@ -82,9 +82,17 @@ class BaseHandler(tornado.web.RequestHandler):
 
 class ResourceHandler(BaseHandler):
     def get(self):
+        content_type = self.request.headers.get('Content-Type')
+        if content_type:
+            self.set_header('Content-Type', content_type)
+
         self.write('get')
 
     def post(self):
+        content_type = self.request.headers.get('Content-Type')
+        if content_type:
+            self.set_header('Content-Type', content_type)
+
         logger.debug(self.request.body)
         self.write(self.request.body)
 
