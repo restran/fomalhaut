@@ -293,7 +293,7 @@ class APIRequest(object):
 
     def signature_request(self):
         string_to_sign = self.string_to_sign()
-        logger.debug(string_to_sign)
+        # logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()
@@ -305,7 +305,7 @@ class APIRequest(object):
         if not self.require_response_sign:
             return True
 
-        logger.debug(response.headers)
+        # logger.debug(response.headers)
         try:
             timestamp = int(response.headers.get('X-Api-Timestamp'))
         except ValueError:
@@ -326,7 +326,7 @@ class APIRequest(object):
             return False
 
         string_to_sign = self.response_string_to_sign(response)
-        logger.debug(string_to_sign)
+        # logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()

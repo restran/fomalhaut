@@ -16,6 +16,7 @@ import hashlib
 import random
 import sys
 from future.utils import iteritems
+from future.builtins import chr
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
