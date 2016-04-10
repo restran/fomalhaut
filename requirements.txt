@@ -1,6 +1,7 @@
+future
+gevent
 cerberus>=0.9
 requests
-six
 tornado>=4.3
 motor>=0.5
 redis

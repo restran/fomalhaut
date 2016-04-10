@@ -10,10 +10,9 @@ import random
 import time
 import hmac
 from hashlib import sha256, sha1
-from utils import utf8, utf8_encoded_dict, text_type, binary_type, AESCipher
-# pycharm 无法识别, 会标记错误, 原因不明
-from six.moves.urllib.parse import urlparse, urlunparse
-from tornado.httputil import urlencode
+from utils import utf8, utf8_encoded_dict, text_type, AESCipher
+from future.moves.urllib.parse import urlparse, urlunparse, urlencode
+from future.utils import iteritems, text_type
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
 import requests
 
@@ -235,7 +234,7 @@ class APIRequest(object):
         in the StringToSign.
         """
         headers_to_sign = {'Host': self.request_data.host}
-        for name, value in self.request_data.headers.items():
+        for name, value in iteritems(self.request_data.headers):
             l_name = name.lower()
             if l_name.startswith('x-api'):
                 headers_to_sign[name] = value
@@ -272,7 +271,7 @@ class APIRequest(object):
         in the StringToSign.
         """
         headers_to_sign = {}
-        for name, value in headers.items():
+        for name, value in iteritems(headers):
             l_name = name.lower()
             if l_name.startswith('x-api'):
                 headers_to_sign[name] = value

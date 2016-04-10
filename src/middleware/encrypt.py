@@ -12,6 +12,7 @@ from tornado.httputil import parse_qs_bytes
 
 from handlers.base import AuthRequestException, ServerErrorException
 from utils import utf8, text_type
+from future.utils import iteritems
 from utils import AESCipher
 from middleware import BaseMiddleware
 
@@ -52,7 +53,7 @@ class EncryptHandler(BaseMiddleware):
                 headers_str = aes_cipher.decrypt(utf8(encrypted_headers))
                 headers = dict(json.loads(headers_str))
                 # logger.debug('raw headers %s' % request.headers)
-                for k, v in headers.items():
+                for k, v in iteritems(headers):
                     # 要全部使用 text_type，否则会出现有的为 str，有的为 unicode
                     # 导致422错误
                     request.headers[text_type(k)] = text_type(v)

@@ -9,7 +9,11 @@ from handlers.endpoint import APIStatusCode
 from cerberus import Validator
 import requests
 from utils import *
+import json
 from tests.api_client import APIClient, APIRequest
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class APIAuthTest(unittest.TestCase):

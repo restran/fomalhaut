@@ -9,7 +9,7 @@ import tornado.ioloop
 import tornado.web
 import logging
 import json
-from six import binary_type
+from future.utils import binary_type
 import tornado
 
 from tornado.options import define, options

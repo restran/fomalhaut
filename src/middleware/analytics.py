@@ -10,9 +10,8 @@ from middleware.exceptions import *
 from middleware import BaseMiddleware
 from tornado import gen
 import motor
-from six import BytesIO
 import hashlib
-from utils import utf8
+from utils import utf8, BytesIO
 from datetime import datetime
 
 logger = logging.getLogger(__name__)

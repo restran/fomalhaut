@@ -9,9 +9,8 @@ import hmac
 from hashlib import sha256, sha1
 import re
 import random
-import traceback
-# pycharm 无法识别, 会标记错误, 原因不明
-from six.moves.urllib.parse import urlparse
+from future.moves.urllib.parse import urlparse
+from future.utils import iteritems
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
 from utils import RedisHelper, utf8, text_type
@@ -156,7 +155,7 @@ class HMACHandler(object):
         in the StringToSign.
         """
         headers_to_sign = {'Host': request.headers.get('Host')}
-        for name, value in request.headers.items():
+        for name, value in iteritems(request.headers):
             l_name = name.lower()
             # 计算签名的时候, 不能包含 x-api-signature
             if l_name.startswith('x-api-') and l_name != 'x-api-signature':
@@ -169,7 +168,7 @@ class HMACHandler(object):
         in the StringToSign.
         """
         headers_to_sign = {}
-        for name, value in response_headers.items():
+        for name, value in iteritems(response_headers):
             l_name = name.lower()
             # 计算签名的时候, 不能包含 x-api-signature
             if l_name.startswith('x-api-') and l_name != 'x-api-signature':
@@ -309,7 +308,7 @@ class HMACAuthenticateHandler(BaseMiddleware):
                 'X-Api-Timestamp': text_type(int(time.time())),
                 'X-Api-Nonce': text_type(random.random()),
             }
-            for k, v in headers.items():
+            for k, v in iteritems(headers):
                 self.handler.set_header(k, v)
 
             response_headers = self.handler.get_response_headers()

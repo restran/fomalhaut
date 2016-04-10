@@ -14,18 +14,37 @@ from copy import copy
 import base64
 import hashlib
 import random
-from six import text_type, binary_type
-
+import sys
+from future.utils import iteritems
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
 
 import settings
 
+__all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8',
+           'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
+           'json_loads', 'new_random_token']
+
 logger = logging.getLogger(__name__)
 
 # 当前进程的id
 PID = os.getpid()
+
+# Useful for very coarse version differentiation.
+PY2 = sys.version_info[0] == 2
+PY3 = sys.version_info[0] == 3
+
+if PY3:
+    from io import BytesIO
+
+    text_type = str
+    binary_type = bytes
+else:
+    from cStringIO import StringIO as BytesIO
+
+    text_type = unicode
+    binary_type = str
 
 # 拷贝 list
 copy_list = (lambda lb: copy(lb) if lb else [])
@@ -70,7 +89,7 @@ def utf8_encoded_dict(in_dict):
     :return:
     """
     out_dict = {}
-    for k, v in in_dict.items():
+    for k, v in iteritems(in_dict):
         out_dict[utf8(k)] = utf8(v)
     return out_dict
 

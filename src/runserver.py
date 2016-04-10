@@ -102,6 +102,8 @@ def main():
     database = db_client[MONGO_DBNAME]
     app.settings['db'] = database
 
+    # TODO gevent may improve performance
+
     ioloop.IOLoop.instance().start()
 
 
