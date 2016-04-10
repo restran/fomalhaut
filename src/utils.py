@@ -123,7 +123,7 @@ class AESCipher(object):
             return plain
 
     def _pad(self, s):
-        return s + (self.bs - len(s) % self.bs) * chr(self.bs - len(s) % self.bs)
+        return s + (self.bs - len(s) % self.bs) * utf8(chr(self.bs - len(s) % self.bs))
 
     @staticmethod
     def _unpad(s):

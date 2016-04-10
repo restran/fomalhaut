@@ -93,7 +93,7 @@ class ResourceHandler(BaseHandler):
         if content_type:
             self.set_header('Content-Type', content_type)
 
-        logger.debug(self.request.body)
+        # logger.debug(self.request.body)
         self.write(self.request.body)
 
 
