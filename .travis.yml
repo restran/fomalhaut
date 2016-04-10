@@ -18,7 +18,7 @@ before_script:
   - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
   - sleep 3
   - cd src
-  - python ./tests/load_config.py
+  - python -m tests.load_config
   - sleep 3
   - python runserver.py &
   - sleep 3
