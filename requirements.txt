@@ -6,4 +6,5 @@ tornado>=4.3
 motor>=0.5
 redis
 pycrypto
+pycurl
 ConcurrentLogHandler
