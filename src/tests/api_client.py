@@ -15,6 +15,7 @@ from future.moves.urllib.parse import urlparse, urlunparse, urlencode
 from future.utils import iteritems, text_type
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
 import requests
+from base64 import b64encode
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +227,7 @@ class APIRequest(object):
     def sign_string(self, string_to_sign):
         new_hmac = hmac.new(utf8(self.secret_key), digestmod=sha256)
         new_hmac.update(utf8(string_to_sign))
-        return new_hmac.digest().encode("base64").rstrip('\n')
+        return text_type(b64encode(new_hmac.digest()).rstrip(b'\n'))
 
     def headers_to_sign(self):
         """
