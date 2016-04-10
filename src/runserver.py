@@ -10,7 +10,8 @@ from tornado.options import define, options
 import motor
 from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
     MONGO_PASSWORD, MONGO_USERNAME
-from utils import RedisHelper, import_string, text_type, binary_type
+from utils import RedisHelper, import_string, \
+    text_type, binary_type, PY2
 from handlers.base import BaseHandler
 import settings
 
@@ -73,8 +74,12 @@ def main():
     r.ping_redis()
 
     # 重新设置一下日志级别，默认情况下，tornado 是 info
-    # options.logging 不能是 Unicode
-    options.logging = binary_type(settings.LOGGING_LEVEL)
+    # py2 下 options.logging 不能是 Unicode
+    if PY2:
+        options.logging = binary_type(settings.LOGGING_LEVEL)
+    else:
+        options.logging = settings.LOGGING_LEVEL
+
     # parse_command_line 的时候将 logging 的根级别设置为 info
     options.parse_command_line()
 
