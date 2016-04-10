@@ -12,8 +12,12 @@ from utils import *
 import json
 from tests.api_client import APIClient, APIRequest
 import logging
+import os
 
 logger = logging.getLogger(__name__)
+
+IMG_FILE = os.path.join(
+    os.path.abspath(os.path.dirname(__file__)), 'img.jpg')
 
 
 class APIAuthTest(unittest.TestCase):
@@ -74,7 +78,7 @@ class APIAuthTest(unittest.TestCase):
         client = APIClient(self.access_key, self.secret_key, self.api_server)
         req = APIRequest(client, self.endpoint, self.version)
 
-        with open('img.jpg', 'rb') as f:
+        with open(IMG_FILE, 'rb') as f:
             body = f.read()
             r = req.post('/resource/', data=body)
 
@@ -110,7 +114,7 @@ class AESTest(unittest.TestCase):
         client = APIClient(self.access_key, self.secret_key, self.api_server)
         req = APIRequest(client, self.endpoint, self.version, encrypt_type='aes')
 
-        with open('img.jpg', 'rb') as f:
+        with open(IMG_FILE, 'rb') as f:
             body = f.read()
             r = req.post('/resource/', data=body)
 
@@ -330,7 +334,7 @@ class ClientPublicAPITest(unittest.TestCase):
         req = APIRequest(client, self.endpoint, self.version,
                          require_hmac=False, require_response_sign=False)
 
-        with open('img.jpg', 'rb') as f:
+        with open(IMG_FILE, 'rb') as f:
             body = f.read()
             r = req.post('/resource/', data=body)
 
@@ -373,7 +377,7 @@ class RawPublicAPITest(unittest.TestCase):
 
     def test_post_img(self):
         url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
-        with open('img.jpg', 'rb') as f:
+        with open(IMG_FILE, 'rb') as f:
             body = f.read()
             r = requests.post(url, data=body)
 
