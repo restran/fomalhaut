@@ -9,11 +9,11 @@ import logging
 import copy
 import traceback
 from tornado.httputil import parse_qs_bytes
-
+from tornado.escape import json_decode
 from handlers.base import AuthRequestException, ServerErrorException
 from utils import utf8, text_type
 from future.utils import iteritems
-from utils import AESCipher
+from utils import AESCipher, json_loads
 from middleware import BaseMiddleware
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class EncryptHandler(BaseMiddleware):
 
             if encrypted_headers:
                 headers_str = aes_cipher.decrypt(utf8(encrypted_headers))
-                headers = dict(json.loads(headers_str))
+                headers = dict(json_decode(headers_str))
                 # logger.debug('raw headers %s' % request.headers)
                 for k, v in iteritems(headers):
                     # 要全部使用 text_type，否则会出现有的为 str，有的为 unicode

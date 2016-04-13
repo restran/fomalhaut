@@ -78,7 +78,7 @@ class BaseHandler(RequestHandler):
 
         self.clear()
         # 因为执行了 clear，把之前设置的 header 也清理掉了，需要重新设置
-        self.set_header("Content-Type", "application/json; charset=utf-8")
+        self.set_header('Content-Type', 'application/json; charset=utf-8')
         # TODO json error message
 
         try:

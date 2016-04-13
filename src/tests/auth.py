@@ -250,7 +250,7 @@ class AuthEndpointTest(unittest.TestCase):
         }
         v = Validator(schema=schema, allow_unknown=True)
         logger.debug(r.content)
-        j = json_loads(r.content)
+        j = json_decode(r.content)
         logger.debug(j)
         logger.debug(r.json())
         logger.debug(v.validate(r.json()))
@@ -372,7 +372,7 @@ class RawPublicAPITest(unittest.TestCase):
         }
 
         url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
-        r = requests.post(url, json=utf8_encoded_dict(json_data))
+        r = requests.post(url, json=json_data)
         self.assertEqual(r.status_code, 200)
 
     def test_post_img(self):

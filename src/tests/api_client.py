@@ -10,7 +10,7 @@ import random
 import time
 import hmac
 from hashlib import sha256, sha1
-from utils import utf8, utf8_encoded_dict, text_type, AESCipher
+from utils import utf8, utf8_encoded_dict, text_type, AESCipher, unicode_encoded_dict, to_unicode
 from future.moves.urllib.parse import urlparse, urlunparse, urlencode
 from future.utils import iteritems, text_type
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
@@ -151,7 +151,6 @@ class APIRequest(object):
             aes_cipher = AESCipher(self.secret_key)
             if body and len(body) > 0:
                 logger.debug('解密 body')
-                logger.debug(body.encode('hex'))
                 body = aes_cipher.decrypt(utf8(body))
                 # logger.debug(body.decode('hex'))
         except Exception as e:
@@ -161,7 +160,7 @@ class APIRequest(object):
             return None
 
         # 由于 requests 的 content 不是 unicode 类型, 为了兼容, 这里改成 utf8
-        if isinstance(body, unicode):
+        if isinstance(body, text_type):
             body = body.encode('utf-8')
 
         return body
@@ -185,7 +184,9 @@ class APIRequest(object):
         if r.status_code != self.gateway_error_status_code:
             is_valid = self.check_response(r)
             if not is_valid:
-                logger.debug('返回结果签名不正确')
+                # TODO 返回结果签名不正确需要给出提示
+                logger.error('返回结果签名不正确')
+                raise ValueError('返回结果签名不正确')
 
         r_encrypt_type = r.headers.get('x-api-encrypt-type', 'raw')
         if r_encrypt_type == 'aes':
@@ -227,7 +228,7 @@ class APIRequest(object):
     def sign_string(self, string_to_sign):
         new_hmac = hmac.new(utf8(self.secret_key), digestmod=sha256)
         new_hmac.update(utf8(string_to_sign))
-        return text_type(b64encode(new_hmac.digest()).rstrip(b'\n'))
+        return to_unicode(b64encode(new_hmac.digest()).rstrip(b'\n'))
 
     def headers_to_sign(self):
         """
@@ -248,6 +249,7 @@ class APIRequest(object):
         case, sorting them in alphabetical order and then joining
         them into a string, separated by newlines.
         """
+        headers_to_sign = unicode_encoded_dict(headers_to_sign)
         l = sorted(['%s: %s' % (n.lower().strip(),
                                 headers_to_sign[n].strip()) for n in headers_to_sign])
         return '\n'.join(l)
@@ -261,9 +263,9 @@ class APIRequest(object):
         headers_to_sign = self.headers_to_sign()
         canonical_headers = self.canonical_headers(headers_to_sign)
         string_to_sign = b'\n'.join([utf8(self.request_data.method.upper()),
-                                     utf8(self.request_data.uri),
-                                     utf8(canonical_headers),
-                                     utf8(self.request_data.body)])
+                                    utf8(self.request_data.uri),
+                                    utf8(canonical_headers),
+                                    utf8(self.request_data.body)])
         return string_to_sign
 
     def response_headers_to_sign(self, headers):
@@ -287,14 +289,15 @@ class APIRequest(object):
         headers_to_sign = self.response_headers_to_sign(response.headers)
         canonical_headers = self.canonical_headers(headers_to_sign)
         string_to_sign = b'\n'.join([utf8(self.request_data.method.upper()),
-                                     utf8(self.request_data.uri),
-                                     utf8(canonical_headers),
-                                     utf8(response.content)])
+                                    utf8(self.request_data.uri),
+                                    utf8(canonical_headers),
+                                    utf8(response.content)])
         return string_to_sign
 
     def signature_request(self):
         string_to_sign = self.string_to_sign()
-        # logger.debug(string_to_sign)
+        logger.debug(utf8(string_to_sign))
+        logger.debug(len(string_to_sign))
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()
@@ -327,7 +330,7 @@ class APIRequest(object):
             return False
 
         string_to_sign = self.response_string_to_sign(response)
-        # logger.debug(string_to_sign)
+        logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()

@@ -17,15 +17,16 @@ import random
 import sys
 from future.utils import iteritems
 from future.builtins import chr
+from tornado.escape import json_decode, utf8, to_unicode
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
 
 import settings
 
-__all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8',
+__all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
-           'json_loads', 'new_random_token']
+           'json_loads', 'new_random_token', 'json_decode']
 
 logger = logging.getLogger(__name__)
 
@@ -72,15 +73,15 @@ def import_string(dotted_path):
         raise ImportError(msg)
 
 
-def utf8(value):
-    """Get the UTF8-encoded version of a value."""
-    if not isinstance(value, binary_type) and not isinstance(value, text_type):
-        value = binary_type(value)
-
-    if isinstance(value, text_type):
-        return value.encode('utf-8')
-    else:
-        return value
+# def utf8(value):
+#     """Get the UTF8-encoded version of a value."""
+#     if not isinstance(value, binary_type) and not isinstance(value, text_type):
+#         value = binary_type(value)
+#
+#     if isinstance(value, text_type):
+#         return value.encode('utf-8')
+#     else:
+#         return value
 
 
 def utf8_encoded_dict(in_dict):
@@ -92,6 +93,18 @@ def utf8_encoded_dict(in_dict):
     out_dict = {}
     for k, v in iteritems(in_dict):
         out_dict[utf8(k)] = utf8(v)
+    return out_dict
+
+
+def unicode_encoded_dict(in_dict):
+    """
+    使用 unicode 重新编码字典
+    :param in_dict:
+    :return:
+    """
+    out_dict = {}
+    for k, v in iteritems(in_dict):
+        out_dict[to_unicode(k)] = to_unicode(v)
     return out_dict
 
 
@@ -108,9 +121,10 @@ class AESCipher(object):
         raw = self._pad(raw)
         iv = Random.new().read(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        return base64.b64encode(iv + cipher.encrypt(raw))
+        return to_unicode(base64.b64encode(iv + cipher.encrypt(raw)))
 
     def decrypt(self, enc):
+        logger.debug(type(enc))
         enc = base64.b64decode(enc)
         iv = enc[:AES.block_size]
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
@@ -147,16 +161,16 @@ class UniqueId(object):
 
 def new_random_token():
     to_hash = UniqueId.new_object_id() + text_type(random.random())
-    token = hashlib.sha1(to_hash).hexdigest()
+    token = hashlib.sha1(utf8(to_hash)).hexdigest()
     logger.debug(token)
     return token
 
 
 def json_loads(data):
     try:
-        return json.loads(data) if data else None
+        return json_decode(data) if data else None
     except Exception as e:
-        logger.error(e.message)
+        logger.error(e)
         logger.error(traceback.format_exc())
 
     return None
@@ -289,7 +303,7 @@ class RedisHelper(object):
             key = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
             cls.get_client().setex(key, json_data, refresh_token_ex)
         except Exception as e:
-            logger.error(e.message)
+            logger.error(e)
             logger.error(traceback.format_exc())
             return None
 
@@ -307,7 +321,7 @@ class RedisHelper(object):
             cls.get_client().setex(key, json_data, settings.ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
             logger.info('add analytics log, %s' % key)
         except Exception as e:
-            logger.error(e.message)
+            logger.error(e)
             logger.error(traceback.format_exc())
             logger.error('保存统计信息出错')
 

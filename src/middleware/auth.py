@@ -9,11 +9,12 @@ import hmac
 from hashlib import sha256, sha1
 import re
 import random
+from tornado.escape import to_unicode
 from future.moves.urllib.parse import urlparse
 from future.utils import iteritems
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
-from utils import RedisHelper, utf8, text_type
+from utils import RedisHelper, utf8, text_type, unicode_encoded_dict
 from middleware import BaseMiddleware
 from cerberus import Validator
 from handlers.proxy import BackendAPIHandler
@@ -148,7 +149,7 @@ class HMACHandler(object):
         logger.debug(string_to_sign)
         new_hmac = hmac.new(utf8(self.client.secret_key), digestmod=sha256)
         new_hmac.update(utf8(string_to_sign))
-        return text_type(b64encode(new_hmac.digest()).rstrip(b'\n'))
+        return to_unicode(b64encode(new_hmac.digest()).rstrip(b'\n'))
 
     def _request_headers_to_sign(self, request):
         """
@@ -184,6 +185,7 @@ class HMACHandler(object):
         case, sorting them in alphabetical order and then joining
         them into a string, separated by newlines.
         """
+        headers_to_sign = unicode_encoded_dict(headers_to_sign)
         l = sorted(['%s: %s' % (n.lower().strip(),
                                 headers_to_sign[n].strip()) for n in headers_to_sign])
         return '\n'.join(l)
@@ -214,6 +216,7 @@ class HMACHandler(object):
                                      utf8(self.client.raw_uri),
                                      utf8(canonical_headers),
                                      utf8(response_body)])
+        logger.debug(string_to_sign)
         return string_to_sign
 
     def signature_response(self, response_header, request, response_body):
@@ -238,7 +241,7 @@ class HMACHandler(object):
             logger.debug('Expired signature, timestamp: %s' % timestamp)
             raise AuthRequestException('Expired Signature')
 
-        signature = request.headers.get('X-Api-Signature')
+        signature = to_unicode(request.headers.get('X-Api-Signature'))
         if not signature:
             logger.debug('No Signature Provided')
             raise AuthRequestException('No Signature Provided')
@@ -246,6 +249,8 @@ class HMACHandler(object):
         string_to_sign = self._request_string_to_sign(request)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
+        logger.debug(utf8(string_to_sign))
+        logger.debug(len(string_to_sign))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:

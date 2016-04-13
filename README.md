@@ -1,6 +1,6 @@
 # API Gateway
 
-![travis-ci](https://travis-ci.org/restran/api-gateway.svg?branch=master)
+[![travis-ci](https://travis-ci.org/restran/api-gateway.svg?branch=master)](https://travis-ci.org/restran/api-gateway)
 
 This project is still in development, api may change anytime. If you want to use it, fix what you need.
 
@@ -20,20 +20,12 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 
 ## 环境及依赖
 
-需要安装 Redis 和 MongoDB, 当前只在 Python 2.7 环境下测试过
+支持的 Python 版本: 2.7, 3.3, 3.4, 3.5, pypy, pypy3
+
+需要先安装 Redis 和 MongoDB，相应的依赖包可以通过以下命令安装:
 
     pip install -r requirement.txt
 
-```
-cerberus>=0.9
-requests
-six
-tornado>=4.0
-redis
-pycrypto
-ConcurrentLogHandler
-motor>=0.5
-```
 
 ## 运行
 

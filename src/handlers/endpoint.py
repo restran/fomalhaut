@@ -14,11 +14,12 @@ from tornado import gen
 from tornado.concurrent import is_future
 from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
 from tornado.httpclient import HTTPRequest
+from tornado.escape import json_decode
 
 from handlers.base import AuthRequestException
 from settings import GATEWAY_ERROR_STATUS_CODE, \
     ASYNC_HTTP_CONNECT_TIMEOUT, ASYNC_HTTP_REQUEST_TIMEOUT
-from utils import RedisHelper
+from utils import RedisHelper, json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class BuiltinAPIHandler(object):
             logger.debug(content_type)
             if content_type.startswith('application/json'):
                 try:
-                    self.post_data = json.loads(self.request.body)
+                    self.post_data = json_decode(self.request.body)
                 except Exception as e:
                     logger.error(e)
             logger.debug(self.post_data)
@@ -167,7 +168,7 @@ class AuthLoginHandler(BuiltinAPIHandler):
             logger.error(traceback.format_exc())
             raise AuthRequestException('Fail to Request Login Auth Url')
 
-        json_data = json.loads(response.body)
+        json_data = json_decode(response.body)
         if json_data['code'] == APIStatusCode.SUCCESS:
             user_info = json_data['data']
             token_info = {
