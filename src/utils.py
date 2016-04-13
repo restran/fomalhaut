@@ -26,7 +26,7 @@ import settings
 
 __all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
-           'json_loads', 'new_random_token', 'json_decode']
+           'json_loads', 'new_random_token', 'json_decode', 'AsyncHTTPClient']
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ PID = os.getpid()
 # Useful for very coarse version differentiation.
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
+PYPY = True if getattr(sys, 'pypy_version_info') else False
 
 if PY3:
     from io import BytesIO
@@ -47,6 +48,16 @@ else:
 
     text_type = unicode
     binary_type = str
+
+if PYPY:
+    # curl_httpclient is faster than simple_httpclient however
+    # curl_httpclient needs pycurl which is not support in pypy
+    from tornado.simple_httpclient import AsyncHTTPClient
+else:
+    try:
+        from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
+    except ImportError:
+        from tornado.simple_httpclient import AsyncHTTPClient
 
 # 拷贝 list
 copy_list = (lambda lb: copy(lb) if lb else [])

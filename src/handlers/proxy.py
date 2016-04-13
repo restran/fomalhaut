@@ -7,13 +7,12 @@ from __future__ import unicode_literals, absolute_import
 import logging
 import traceback
 from tornado import gen
-from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.httputil import HTTPHeaders
 
 import settings
 from middleware.analytics import ResultCode
-from utils import text_type
+from utils import text_type, AsyncHTTPClient
 
 logger = logging.getLogger(__name__)
 
