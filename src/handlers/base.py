@@ -7,6 +7,7 @@ from __future__ import unicode_literals, absolute_import
 import logging
 import traceback
 import sys
+import json
 from middleware.analytics import ResultCode
 from middleware.exceptions import *
 from tornado.web import RequestHandler
@@ -14,6 +15,7 @@ from tornado.concurrent import is_future
 from tornado import gen
 from tornado.httputil import HTTPHeaders
 from middleware.analytics import AnalyticsData
+from settings import GATEWAY_ERROR_STATUS_CODE
 from utils import text_type, copy_list
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,6 @@ class BaseHandler(RequestHandler):
         self.clear()
         # 因为执行了 clear，把之前设置的 header 也清理掉了，需要重新设置
         self.set_header('Content-Type', 'application/json; charset=utf-8')
-        # TODO json error message
 
         try:
             if status_code == GATEWAY_ERROR_STATUS_CODE:
@@ -91,6 +92,7 @@ class BaseHandler(RequestHandler):
             self.set_status(status_code, 'Unknown Status Code')
 
         ex = kwargs['exc_info'][1]
+
         # any 表示只要有一个为 true 就可以
         if any(isinstance(ex, c) for c in [APIGatewayException]):
             logger.debug('api exception: %s' % ex)
@@ -106,11 +108,23 @@ class BaseHandler(RequestHandler):
             elif self.analytics.result_code is None:
                 self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
 
-            self.write('%s %s' % (status_code, get_exc_message(ex)))
+            error_msg = '%s %s' % (status_code, get_exc_message(ex))
         else:
             logger.error(get_exc_message(ex))
             logger.error(traceback.format_exc())
             self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
+            error_msg = '500 Internal Error'
+
+        json_str = json.dumps({
+            'code': GATEWAY_ERROR_STATUS_CODE,
+            'data': None,
+            'msg': error_msg
+        })
+        logger.debug(json_str)
+        try:
+            self.write(json_str)
+        except Exception as e:
+            logger.error(e)
             self.write('500 Internal Error')
 
         if not self._finished:

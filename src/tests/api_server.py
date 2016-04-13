@@ -7,7 +7,7 @@ from __future__ import unicode_literals, absolute_import
 import tornado.httpserver
 import tornado.ioloop
 import tornado.web
-from tornado.escape import json_encode
+from tornado.escape import native_str, json_decode
 import logging
 import json
 from future.utils import binary_type
@@ -42,7 +42,7 @@ class BaseHandler(tornado.web.RequestHandler):
             content_type = self.request.headers.get('Content-Type', '').lower()
             if content_type.startswith('application/json'):
                 try:
-                    self.post_data = json.loads(self.request.body)
+                    self.post_data = json_decode(self.request.body)
                 except Exception as e:
                     logger.error(e)
             logger.debug(content_type)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         (r'/resource/?', ResourceHandler),
     ]
     app = tornado.web.Application(handlers=handlers, debug=True)
-    options.logging = binary_type('DEBUG')
+    options.logging = native_str('DEBUG')
     tornado.options.parse_command_line()
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
     http_server.listen(options.port, options.host)

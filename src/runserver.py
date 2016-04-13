@@ -7,6 +7,7 @@ import logging
 
 from tornado import httpserver, ioloop, web
 from tornado.options import define, options
+from tornado.httputil import native_str
 import motor
 from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
     MONGO_PASSWORD, MONGO_USERNAME
@@ -75,10 +76,7 @@ def main():
 
     # 重新设置一下日志级别，默认情况下，tornado 是 info
     # py2 下 options.logging 不能是 Unicode
-    if PY2:
-        options.logging = binary_type(settings.LOGGING_LEVEL)
-    else:
-        options.logging = settings.LOGGING_LEVEL
+    options.logging = native_str(settings.LOGGING_LEVEL)
 
     # parse_command_line 的时候将 logging 的根级别设置为 info
     options.parse_command_line()

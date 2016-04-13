@@ -203,7 +203,7 @@ class RedisHelper(object):
         config_data = cls.get_client().get(
             '%s:%s' % (settings.CLIENT_CONFIG_REDIS_PREFIX, access_key))
 
-        logger.debug(config_data)
+        # logger.debug(config_data)
         # 数据全部是存json
         return json_loads(config_data)
 
