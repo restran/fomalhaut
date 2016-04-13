@@ -36,7 +36,7 @@ PID = os.getpid()
 # Useful for very coarse version differentiation.
 PY2 = sys.version_info[0] == 2
 PY3 = sys.version_info[0] == 3
-PYPY = True if getattr(sys, 'pypy_version_info') else False
+PYPY = True if getattr(sys, 'pypy_version_info', None) else False
 
 if PY3:
     from io import BytesIO
