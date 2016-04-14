@@ -15,6 +15,7 @@ import base64
 import hashlib
 import random
 import sys
+import time
 from future.utils import iteritems
 from future.builtins import chr
 from tornado.escape import json_decode, utf8, to_unicode
@@ -26,7 +27,8 @@ import settings
 
 __all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
-           'json_loads', 'new_random_token', 'json_decode', 'AsyncHTTPClient']
+           'json_loads', 'new_random_token', 'json_decode', 'AsyncHTTPClient',
+           'CacheConfigHandler']
 
 logger = logging.getLogger(__name__)
 
@@ -82,17 +84,6 @@ def import_string(dotted_path):
         msg = 'Module "%s" does not define a "%s" attribute/class' % (
             module_path, class_name)
         raise ImportError(msg)
-
-
-# def utf8(value):
-#     """Get the UTF8-encoded version of a value."""
-#     if not isinstance(value, binary_type) and not isinstance(value, text_type):
-#         value = binary_type(value)
-#
-#     if isinstance(value, text_type):
-#         return value.encode('utf-8')
-#     else:
-#         return value
 
 
 def utf8_encoded_dict(in_dict):
@@ -185,6 +176,27 @@ def json_loads(data):
         logger.error(traceback.format_exc())
 
     return None
+
+
+class CacheConfigHandler(object):
+    """
+    带有缓存的配置读取
+    """
+    _cached_config = {}
+
+    @classmethod
+    def get_client_config(cls, access_key):
+        config = cls._cached_config.get(access_key)
+        now_ts = int(time.time())
+        if config:
+            ts = config['ts']
+            now_ts = int(time.time())
+            if now_ts - ts <= settings.CONFIG_CACHE_EXPIRE_SECONDS:
+                return config['data']
+
+        config_data = RedisHelper.get_client_config(access_key)
+        cls._cached_config[access_key] = {'ts': now_ts, 'data': config_data}
+        return config_data
 
 
 class RedisHelper(object):

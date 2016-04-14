@@ -14,7 +14,7 @@ from future.moves.urllib.parse import urlparse
 from future.utils import iteritems
 import settings
 from handlers.base import AuthRequestException, ClientBadConfigException
-from utils import RedisHelper, utf8, text_type, unicode_encoded_dict
+from utils import CacheConfigHandler, utf8, text_type, unicode_encoded_dict
 from middleware import BaseMiddleware
 from cerberus import Validator
 from handlers.proxy import BackendAPIHandler
@@ -117,7 +117,7 @@ class Client(object):
         self.get_client_config()
 
     def get_client_config(self):
-        config_data = RedisHelper.get_client_config(self.access_key)
+        config_data = CacheConfigHandler.get_client_config(self.access_key)
         if config_data is None:
             raise ClientBadConfigException('No Client Config')
         else:

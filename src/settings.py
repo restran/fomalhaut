@@ -84,6 +84,8 @@ REFRESH_TOKEN_REDIS_PREFIX = 'r'
 # 统计分析日志的 redis key 前缀
 ANALYTICS_LOG_REDIS_PREFIX = 'a'
 
+# 为了避免每次请求都读取一次 redis, 在程序内实现一个缓存
+CONFIG_CACHE_EXPIRE_SECONDS = 5 * 60
 # 分析统计日志，在 redis 中的过期时间
 ANALYTICS_LOG_REDIS_EXPIRE_SECONDS = 30 * 60
 
