@@ -11,8 +11,7 @@ from tornado.httputil import native_str
 import motor
 from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
     MONGO_PASSWORD, MONGO_USERNAME
-from utils import RedisHelper, import_string, \
-    text_type, binary_type, PY2
+from utils import RedisHelper, import_string, text_type
 from handlers.base import BaseHandler
 import settings
 

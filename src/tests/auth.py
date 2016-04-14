@@ -197,6 +197,7 @@ class AuthEndpointTest(unittest.TestCase):
                            json=json_data)
         self.assertEqual(r.status_code, 200)
         v = Validator(schema=schema, allow_unknown=True)
+        # logger.debug(ar.content)
         logger.debug(ar.json())
         self.assertEqual(v.validate(ar.json()), True)
         # ---------------------
@@ -280,6 +281,7 @@ class AuthEndpointTest(unittest.TestCase):
                            json=json_data)
         self.assertEqual(r.status_code, 200)
         v = Validator(schema=schema, allow_unknown=True)
+        logger.debug(ar.content)
         logger.debug(ar.json())
         self.assertEqual(v.validate(ar.json()), True)
         # ---------------------

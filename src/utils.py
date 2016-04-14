@@ -19,7 +19,7 @@ import time
 from future.utils import iteritems
 from future.builtins import chr
 from tornado.escape import json_decode, utf8, to_unicode
-from base64 import b64encode
+from base64 import b32encode
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
@@ -165,7 +165,8 @@ class UniqueId(object):
 def new_random_token():
     to_hash = UniqueId.new_object_id() + text_type(random.random())
     token = hashlib.sha1(utf8(to_hash)).digest()
-    token = to_unicode(b64encode(token).rstrip(b'\n'))
+    # 不能用 base64 因为有些字符不能用在 url 上, 比如 + 号会变成空格, 导致 access_token 作为 url 的参数时会出错
+    token = to_unicode(b32encode(token).rstrip(b'\n'))
     logger.debug(token)
     return token
 
@@ -231,20 +232,6 @@ class RedisHelper(object):
         # logger.debug(config_data)
         # 数据全部是存json
         return json_loads(config_data)
-
-    @classmethod
-    def get_token_info(cls, access_token):
-        """
-        获取 client 配置
-        :param access_token:
-        :return:
-        """
-        token_info = cls.get_client().get(
-            '%s:%s' % (settings.CLIENT_CONFIG_REDIS_PREFIX, access_token))
-
-        logger.debug(token_info)
-        # 数据全部是存 json
-        return json_loads(token_info)
 
     @classmethod
     def get_access_token_info(cls, access_token):
@@ -324,6 +311,7 @@ class RedisHelper(object):
             json_data = json.dumps(token_info)
             key_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
             pipe = cls.get_client().pipeline()
+            # 如果是用 StrictRedis, time 和 value 顺序不一样
             pipe.setex(key_a, access_token_ex, json_data)
             key_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
             pipe.setex(key_r, refresh_token_ex, json_data)
