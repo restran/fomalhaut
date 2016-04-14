@@ -19,7 +19,7 @@ NUM_PROCESSES = 0
 # 是否调试模式
 DEBUG = True
 # 代码修改时, 是否自动重启
-AUTO_RELOAD = True
+AUTO_RELOAD = True if DEBUG else False
 
 # 中间件会按顺序执行
 MIDDLEWARE_CLASSES = [
@@ -66,7 +66,6 @@ REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
 REDIS_PASSWORD = 'secret'
-REDIS_MAX_CONNECTIONS = 100
 
 # MongoDB 配置
 MONGO_HOST = '127.0.0.1'
@@ -81,8 +80,8 @@ CLIENT_CONFIG_REDIS_PREFIX = 'config'
 ACCESS_TOKEN_REDIS_PREFIX = 't'
 # access_token redis 中 key 前缀
 REFRESH_TOKEN_REDIS_PREFIX = 'r'
-# 统计分析日志的 redis key 前缀
-ANALYTICS_LOG_REDIS_PREFIX = 'a'
+# redis 中统计分析日志列表的 key
+ANALYTICS_LOG_REDIS_LIST_KEY = 'logs'
 
 # 为了避免每次请求都读取一次 redis, 在程序内实现一个缓存
 CONFIG_CACHE_EXPIRE_SECONDS = 5 * 60

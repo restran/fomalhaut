@@ -19,6 +19,7 @@ import time
 from future.utils import iteritems
 from future.builtins import chr
 from tornado.escape import json_decode, utf8, to_unicode
+from base64 import b64encode
 from Crypto import Random
 from Crypto.Cipher import AES
 import redis
@@ -163,7 +164,8 @@ class UniqueId(object):
 
 def new_random_token():
     to_hash = UniqueId.new_object_id() + text_type(random.random())
-    token = hashlib.sha1(utf8(to_hash)).hexdigest()
+    token = hashlib.sha1(utf8(to_hash)).digest()
+    token = to_unicode(b64encode(token).rstrip(b'\n'))
     logger.debug(token)
     return token
 
@@ -203,18 +205,18 @@ class RedisHelper(object):
     """
     redis 连接助手
     """
-    _connection_pool = None
+    _client = None
 
     def __init__(self):
-        if RedisHelper._connection_pool is None:
+        if RedisHelper._client is None:
             self._create_redis_client()
 
     @classmethod
     def get_client(cls):
-        if RedisHelper._connection_pool is None:
+        if RedisHelper._client is None:
             cls._create_redis_client()
 
-        return redis.Redis(connection_pool=RedisHelper._connection_pool)
+        return RedisHelper._client
 
     @classmethod
     def get_client_config(cls, access_key):
@@ -319,34 +321,19 @@ class RedisHelper(object):
             return None
 
         try:
-            json_data = json.dumps(token_info, ensure_ascii=False)
-            key = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
-            cls.get_client().setex(key, json_data, access_token_ex)
-            json_data = json.dumps(token_info, ensure_ascii=False)
-            key = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
-            cls.get_client().setex(key, json_data, refresh_token_ex)
+            json_data = json.dumps(token_info)
+            key_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
+            pipe = cls.get_client().pipeline()
+            pipe.setex(key_a, access_token_ex, json_data)
+            key_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
+            pipe.setex(key_r, refresh_token_ex, json_data)
+            pipe.execute()
         except Exception as e:
             logger.error(e)
             logger.error(traceback.format_exc())
             return None
 
         return token_info
-
-    @classmethod
-    def add_analytics_log(cls, log_item):
-        """
-        插入统计分析的日志到 redis 中
-        :return:
-        """
-        try:
-            json_data = json.dumps(log_item, ensure_ascii=False)
-            key = '%s:%s' % (settings.ANALYTICS_LOG_REDIS_PREFIX, UniqueId.new_object_id())
-            cls.get_client().setex(key, json_data, settings.ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
-            logger.info('add analytics log, %s' % key)
-        except Exception as e:
-            logger.error(e)
-            logger.error(traceback.format_exc())
-            logger.error('保存统计信息出错')
 
     @classmethod
     def ping_redis(cls):
@@ -359,10 +346,10 @@ class RedisHelper(object):
     @classmethod
     def _create_redis_client(cls):
         """
-        创建连接池
+        创建连接
         :return:
         """
-        RedisHelper._connection_pool = redis.ConnectionPool(
+        RedisHelper._client = redis.StrictRedis(
             host=settings.REDIS_HOST, port=settings.REDIS_PORT,
             db=settings.REDIS_DB, password=settings.REDIS_PASSWORD)
 

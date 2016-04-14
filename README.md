@@ -138,9 +138,8 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 - [x] 登录校验, 检查 `access_token`
 - [x] 内置登录, 注销和更新 `access_token` 的 API
 - [ ] 单点登录, 在一个地方登录, 旧的 `access_token` 和 `refresh_token` 要失效
-- [x] 访问统计数据, 原先为先缓存到 redis, 修改为直接写到 MongoDB
 - [x] 访问日志存储的请求完整内容进行大小限制
-- [ ] 配置信息程序内缓存
+- [x] 配置信息程序内缓存
 - [ ] API 监控, 访问异常可以邮件告警
 - [ ] Rate-Limiting
 - [ ] api-android-client

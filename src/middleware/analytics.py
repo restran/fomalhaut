@@ -5,13 +5,14 @@
 from __future__ import unicode_literals, absolute_import
 
 import time
-from settings import ACCESS_LOG_BODY_MAX_LENGTH, ACCESS_LOG_HEADERS_MAX_LENGTH
+from settings import *
 from middleware.exceptions import *
 from middleware import BaseMiddleware
 from tornado import gen
 import motor
 import hashlib
-from utils import utf8, BytesIO
+import json
+from utils import utf8, BytesIO, RedisHelper, UniqueId
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -45,13 +46,38 @@ class HTTPData(object):
         self.headers_id = None
         self.body_id = None
 
-    def get_json(self):
+    def get_json(self, save_to_redis=False):
         j = {
             'content_type': self.content_type,
             'headers': self.headers_id,
             'body': self.body_id
         }
-        logger.debug(j)
+
+        if save_to_redis:
+            j['headers'] = self.headers_id,
+            j['body'] = self.body_id
+        else:
+            header_list = []
+            for k, v in self.headers.get_all():
+                header_list.append('%s: %s' % (k, v))
+            header_content = '\n'.join(header_list)
+            # 内容过长, 截断
+            if len(header_content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
+                header_content = header_content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
+
+            j['headers'] = header_content
+
+            if self.body is not None and len(self.body) > 0:
+                # 内容过长, 截断
+                if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
+                    body_content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
+                else:
+                    body_content = self.body
+            else:
+                body_content = ''
+
+            j['body'] = body_content
+
         return j
 
     @gen.coroutine
@@ -85,6 +111,40 @@ class HTTPData(object):
                 self.content_type, True)
             logger.debug(self.body_id)
 
+    # @gen.coroutine
+    # def save_to_redis(self, pipe, object_id, data_type):
+    #     if self.headers is not None:
+    #         header_list = []
+    #         for k, v in self.headers.get_all():
+    #             header_list.append('%s: %s' % (k, v))
+    #         content = '\n'.join(header_list)
+    #         if content == '':
+    #             self.headers_id = None
+    #         else:
+    #             # 内容过长, 截断
+    #             if len(content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
+    #                 content = content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
+    #
+    #             if data_type == 'request':
+    #                 flag = ANALYTICS_LOG_REDIS_FLAG_REQUEST_HEADER
+    #             else:
+    #                 flag = ANALYTICS_LOG_REDIS_FLAG_RESPONSE_HEADER
+    #
+    #             key_id = '%s:%s:%s' % (ANALYTICS_LOG_REDIS_PREFIX, object_id,  flag)
+    #             pipe.setex(key_id, content, ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
+    #
+    #     if self.body is not None and len(self.body) > 0:
+    #         # 内容过长, 截断
+    #         if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
+    #             content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
+    #         else:
+    #             content = self.body
+    #
+    #         self.body_id = yield self.write_file(
+    #             db, '%s_%s' % (data_type, 'body'), content,
+    #             self.content_type, True)
+    #         logger.debug(self.body_id)
+
     @gen.coroutine
     def write_file(self, db, collection, data, content_type='', hash_id=False):
         fs = motor.motor_tornado.MotorGridFS(db, collection=collection)
@@ -96,6 +156,7 @@ class HTTPData(object):
             # TODO md5 may not safe to check content unique
             md5 = hashlib.md5(content.getvalue()).hexdigest()
             # file_name = hashlib.sha1(content.getvalue()).digest().encode("base64").rstrip('\n')
+            # TODO 并发情况下, 这里会出问题, 导致可能有相同md5的数据
             grid_out = yield fs.find_one({'md5': md5})
             if not grid_out:
                 _id = yield fs.put(content, content_type=content_type)
@@ -120,7 +181,7 @@ class HTTPRequestData(HTTPData):
         self.uri = None
         self.method = None
 
-    def get_json(self):
+    def get_json(self, save_to_redis=False):
         j = super(HTTPRequestData, self).get_json()
         j['method'] = self.method
         j['uri'] = self.uri
@@ -136,7 +197,7 @@ class HTTPResponseData(HTTPData):
         super(HTTPResponseData, self).__init__()
         self.status = None
 
-    def get_json(self):
+    def get_json(self, save_to_redis=False):
         j = super(HTTPResponseData, self).get_json()
         j['status'] = self.status
         return j
@@ -171,7 +232,7 @@ class AnalyticsData(object):
         self.request = HTTPRequestData()
         self.response = HTTPResponseData()
 
-    def get_json(self):
+    def get_json(self, save_to_redis=False):
         json_data = {
             'ip': self.ip,
             'client': {
@@ -189,18 +250,24 @@ class AnalyticsData(object):
             'elapsed': self.elapsed,
             'result_code': self.result_code,
             'result_msg': self.result_msg,
-            'request': self.request.get_json(),
-            'response': self.response.get_json(),
+            'request': self.request.get_json(save_to_redis),
+            'response': self.response.get_json(save_to_redis),
         }
 
         return json_data
 
     @gen.coroutine
     def save(self, database):
+        # TODO 保存请求数据和响应数据速度很慢, 影响性能
         yield self.request.save(database, 'request')
         yield self.response.save(database, 'response')
-        future = yield database.access_log.insert(self.get_json())
-        logger.debug(future)
+        yield database.access_log.insert(self.get_json())
+
+    @gen.coroutine
+    def save_to_redis(self):
+        r = RedisHelper.get_client()
+        access_log = json.dumps(self.get_json(save_to_redis=True))
+        r.rpush(ANALYTICS_LOG_REDIS_LIST_KEY, access_log)
 
 
 class AnalyticsHandler(BaseMiddleware):
@@ -263,6 +330,10 @@ class AnalyticsHandler(BaseMiddleware):
             analytics.is_builtin = endpoint.get('is_builtin', False)
             analytics.forward_url = client.request.get('forward_url')
 
-        db = self.handler.settings['db']
-        # 将统计数据存储在 MongoDB 中
-        yield analytics.save(db)
+        # db = self.handler.settings['db']
+        # 将统计数据存储在 MongoDB 中, 性能较差
+        # yield analytics.save(db)
+
+        # 日志先临时保存到 redis 中
+        analytics.save_to_redis()
+
