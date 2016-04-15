@@ -70,7 +70,6 @@ class APIRequest(object):
 
         method = method.upper()
         params = utf8_encoded_dict(params)
-        logger.debug(uri)
         url = '/'.join([self.api_server, self.endpoint, self.version]) + uri.strip()
         logger.debug(url)
         url_parsed = urlparse(url)
@@ -143,7 +142,7 @@ class APIRequest(object):
 
         if self.request_data.body is not None and len(self.request_data.body) > 0:
             self.request_data.body = aes_cipher.encrypt(utf8(self.request_data.body))
-            logger.debug(self.request_data.body)
+            # logger.debug(self.request_data.body)
         return url
 
     def decrypt_data(self, body):
@@ -201,7 +200,7 @@ class APIRequest(object):
         if self.encrypt_type == 'aes':
             url = self.encrypt_data()
         self.request_data.headers.update(self.get_auth_headers())
-        logger.debug(self.request_data.headers)
+        # logger.debug(self.request_data.headers)
 
         # 需要对请求的内容进行 hmac 签名
         if self.require_hmac:
@@ -212,7 +211,7 @@ class APIRequest(object):
                           data=utf8(self.request_data.body), **kwargs)
 
         logger.debug(url)
-        logger.debug(self.request_data.headers)
+        # logger.debug(self.request_data.headers)
 
         if r.status_code != GATEWAY_ERROR_STATUS_CODE:
             is_valid = self.check_response(r)
@@ -263,9 +262,9 @@ class APIRequest(object):
         headers_to_sign = self.headers_to_sign()
         canonical_headers = self.canonical_headers(headers_to_sign)
         string_to_sign = b'\n'.join([utf8(self.request_data.method.upper()),
-                                    utf8(self.request_data.uri),
-                                    utf8(canonical_headers),
-                                    utf8(self.request_data.body)])
+                                     utf8(self.request_data.uri),
+                                     utf8(canonical_headers),
+                                     utf8(self.request_data.body)])
         return string_to_sign
 
     def response_headers_to_sign(self, headers):
@@ -289,15 +288,13 @@ class APIRequest(object):
         headers_to_sign = self.response_headers_to_sign(response.headers)
         canonical_headers = self.canonical_headers(headers_to_sign)
         string_to_sign = b'\n'.join([utf8(self.request_data.method.upper()),
-                                    utf8(self.request_data.uri),
-                                    utf8(canonical_headers),
-                                    utf8(response.content)])
+                                     utf8(self.request_data.uri),
+                                     utf8(canonical_headers),
+                                     utf8(response.content)])
         return string_to_sign
 
     def signature_request(self):
         string_to_sign = self.string_to_sign()
-        logger.debug(utf8(string_to_sign))
-        logger.debug(len(string_to_sign))
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()
@@ -330,7 +327,6 @@ class APIRequest(object):
             return False
 
         string_to_sign = self.response_string_to_sign(response)
-        logger.debug(string_to_sign)
         # 如果不是 unicode 输出会引发异常
         # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()

@@ -216,7 +216,7 @@ class HMACHandler(object):
                                      utf8(self.client.raw_uri),
                                      utf8(canonical_headers),
                                      utf8(response_body)])
-        logger.debug(string_to_sign)
+        # logger.debug(string_to_sign)
         return string_to_sign
 
     def signature_response(self, response_header, request, response_body):
@@ -247,10 +247,6 @@ class HMACHandler(object):
             raise AuthRequestException('No Signature Provided')
 
         string_to_sign = self._request_string_to_sign(request)
-        # 如果不是 unicode 输出会引发异常
-        # logger.debug('string_to_sign: %s' % string_to_sign.decode('utf-8'))
-        logger.debug(utf8(string_to_sign))
-        logger.debug(len(string_to_sign))
         hash_value = sha1(utf8(string_to_sign)).hexdigest()
         real_signature = self.sign_string(hash_value)
         if signature != real_signature:
