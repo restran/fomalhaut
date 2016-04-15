@@ -62,7 +62,7 @@ MONGO_DBNAME = 'api_gateway'
 
 ## 相关项目
 
-1. [api-gateway-dashbaord](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
+1. [api-gateway-dashboard](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
 2. [api-python-client](https://github.com/restran/api-python-client) Python 版本的 API Client
 
 
@@ -132,6 +132,12 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 ## 部署和使用
 
 内置的 Endpoint 需要在控制台 api-gateway-dashboard 中配置才能使用
+
+### 访问日志存储
+
+为了加快速度, api-gateway 产生的访问日志会临时存储在 Redis 中的列表中, 在 api-gateway-dashboard 项目中配置了一个 Celery 定期任务, 会自动将访问日志迁移到 MongoDB。因此必须同时将这些 Celery 任务同时运行起来, 才能保证 api-gateway 的正常运行。
+
+这些 Celery 后台任务的运行方法, 请查看 [api-gateway-dashboard](https://github.com/restran/api-gateway-dashboard) 的相关文档。
 
 ## TODO
 
