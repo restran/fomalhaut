@@ -12,7 +12,8 @@ from tornado import gen
 import motor
 import hashlib
 import json
-from utils import utf8, BytesIO, RedisHelper, UniqueId
+from utils import utf8, BytesIO, RedisHelper
+from base64 import b64encode
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,7 @@ class HTTPData(object):
             'body': self.body_id
         }
 
-        if save_to_redis:
+        if not save_to_redis:
             j['headers'] = self.headers_id,
             j['body'] = self.body_id
         else:
@@ -65,7 +66,7 @@ class HTTPData(object):
             if len(header_content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
                 header_content = header_content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
 
-            j['headers'] = header_content
+            j['headers'] = b64encode(header_content)
 
             if self.body is not None and len(self.body) > 0:
                 # 内容过长, 截断
@@ -76,7 +77,7 @@ class HTTPData(object):
             else:
                 body_content = ''
 
-            j['body'] = body_content
+            j['body'] = b64encode(body_content)
 
         return j
 
@@ -110,40 +111,6 @@ class HTTPData(object):
                 db, '%s_%s' % (data_type, 'body'), content,
                 self.content_type, True)
             logger.debug(self.body_id)
-
-    # @gen.coroutine
-    # def save_to_redis(self, pipe, object_id, data_type):
-    #     if self.headers is not None:
-    #         header_list = []
-    #         for k, v in self.headers.get_all():
-    #             header_list.append('%s: %s' % (k, v))
-    #         content = '\n'.join(header_list)
-    #         if content == '':
-    #             self.headers_id = None
-    #         else:
-    #             # 内容过长, 截断
-    #             if len(content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
-    #                 content = content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
-    #
-    #             if data_type == 'request':
-    #                 flag = ANALYTICS_LOG_REDIS_FLAG_REQUEST_HEADER
-    #             else:
-    #                 flag = ANALYTICS_LOG_REDIS_FLAG_RESPONSE_HEADER
-    #
-    #             key_id = '%s:%s:%s' % (ANALYTICS_LOG_REDIS_PREFIX, object_id,  flag)
-    #             pipe.setex(key_id, content, ANALYTICS_LOG_REDIS_EXPIRE_SECONDS)
-    #
-    #     if self.body is not None and len(self.body) > 0:
-    #         # 内容过长, 截断
-    #         if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
-    #             content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
-    #         else:
-    #             content = self.body
-    #
-    #         self.body_id = yield self.write_file(
-    #             db, '%s_%s' % (data_type, 'body'), content,
-    #             self.content_type, True)
-    #         logger.debug(self.body_id)
 
     @gen.coroutine
     def write_file(self, db, collection, data, content_type='', hash_id=False):
@@ -182,7 +149,7 @@ class HTTPRequestData(HTTPData):
         self.method = None
 
     def get_json(self, save_to_redis=False):
-        j = super(HTTPRequestData, self).get_json()
+        j = super(HTTPRequestData, self).get_json(save_to_redis)
         j['method'] = self.method
         j['uri'] = self.uri
         return j
@@ -198,7 +165,7 @@ class HTTPResponseData(HTTPData):
         self.status = None
 
     def get_json(self, save_to_redis=False):
-        j = super(HTTPResponseData, self).get_json()
+        j = super(HTTPResponseData, self).get_json(save_to_redis)
         j['status'] = self.status
         return j
 
@@ -246,13 +213,17 @@ class AnalyticsData(object):
                 'is_builtin': self.is_builtin,
             },
             'forward_url': self.forward_url,
-            'accessed_at': datetime.fromtimestamp(self.timestamp / 1000.0),
             'elapsed': self.elapsed,
             'result_code': self.result_code,
             'result_msg': self.result_msg,
             'request': self.request.get_json(save_to_redis),
             'response': self.response.get_json(save_to_redis),
         }
+
+        if save_to_redis:
+            json_data['accessed_at'] = self.timestamp
+        else:
+            json_data['accessed_at'] = datetime.fromtimestamp(self.timestamp / 1000.0)
 
         return json_data
 
@@ -263,7 +234,6 @@ class AnalyticsData(object):
         yield self.response.save(database, 'response')
         yield database.access_log.insert(self.get_json())
 
-    @gen.coroutine
     def save_to_redis(self):
         r = RedisHelper.get_client()
         access_log = json.dumps(self.get_json(save_to_redis=True))
@@ -336,4 +306,3 @@ class AnalyticsHandler(BaseMiddleware):
 
         # 日志先临时保存到 redis 中
         analytics.save_to_redis()
-
