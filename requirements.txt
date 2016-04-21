@@ -1,4 +1,3 @@
-gevent
 future
 cerberus>=0.9
 requests
