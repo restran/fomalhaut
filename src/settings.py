@@ -14,8 +14,6 @@ LOG_PATH = os.path.join(BASE_PATH, 'logs')
 
 HOST = '127.0.0.1'
 PORT = 6500
-# 如果设置为 0 的话, 默认会让进程数等于 CPU 的核心数量
-NUM_PROCESSES = 0
 # 是否调试模式
 DEBUG = True
 # 代码修改时, 是否自动重启
@@ -84,7 +82,7 @@ REFRESH_TOKEN_REDIS_PREFIX = 'r'
 ANALYTICS_LOG_REDIS_LIST_KEY = 'logs'
 
 # 为了避免每次请求都读取一次 redis, 在程序内实现一个缓存
-CONFIG_CACHE_EXPIRE_SECONDS = 5 * 60
+CONFIG_CACHE_EXPIRE_SECONDS = 1 * 60
 # 分析统计日志，在 redis 中的过期时间
 ANALYTICS_LOG_REDIS_EXPIRE_SECONDS = 30 * 60
 

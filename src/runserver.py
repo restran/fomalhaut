@@ -4,14 +4,10 @@
 from __future__ import unicode_literals, absolute_import
 
 import logging
-
-from tornado import httpserver, ioloop, web
+from tornado import httpserver, ioloop
 from tornado.options import define, options
 from tornado.httputil import native_str
-import motor
-from settings import MONGO_DBNAME, MONGO_HOST, MONGO_PORT, \
-    MONGO_PASSWORD, MONGO_USERNAME
-from utils import RedisHelper, import_string, text_type
+from utils import RedisHelper, import_string, text_type, PYPY
 from handlers.base import BaseHandler
 import settings
 
@@ -19,10 +15,14 @@ logger = logging.getLogger(__name__)
 
 define("host", default=settings.HOST, help="run on the given host", type=str)
 define("port", default=settings.PORT, help="run on the given port", type=int)
-define("num_processes", default=settings.NUM_PROCESSES, help="process num", type=int)
+
+if PYPY:
+    from tornado.web import Application as WebApplication
+else:
+    from tornado.wsgi import WSGIApplication as WebApplication
 
 
-class Application(web.Application):
+class Application(WebApplication):
     def __init__(self):
         tornado_settings = {
             'autoreload': settings.AUTO_RELOAD,
@@ -76,37 +76,22 @@ def main():
     # 重新设置一下日志级别，默认情况下，tornado 是 info
     # py2 下 options.logging 不能是 Unicode
     options.logging = native_str(settings.LOGGING_LEVEL)
-
     # parse_command_line 的时候将 logging 的根级别设置为 info
     options.parse_command_line()
-
     app = Application()
-    server = httpserver.HTTPServer(app, xheaders=True)
-
-    # 如果开启了 autoreload 会出现错误
-    # You cannot call IOLoop.instance() before calling start_processes()
-    if settings.AUTO_RELOAD:
-        server.listen(options.port, options.host)
-    else:
-        server.bind(options.port, options.host)
-        server.start(options.num_processes)
 
     logger.info('api gateway server is running on %s:%s' % (options.host, options.port))
 
-    # 因为 motor 基于 IOLoop.instance() 所以需要等创建多进程后才创建
-    # 否则会出现错误 You cannot call IOLoop.instance() before calling start_processes()
-    # 创建一个数据库连接池
-    db_client = motor.motor_tornado.MotorClient(
-        MONGO_HOST, MONGO_PORT, max_pool_size=200)
-    # 验证数据库用户名和密码
-    db_client[MONGO_DBNAME].authenticate(
-        MONGO_USERNAME, MONGO_PASSWORD, mechanism='SCRAM-SHA-1')
-    database = db_client[MONGO_DBNAME]
-    app.settings['db'] = database
-
-    # TODO gevent may improve performance
-
-    ioloop.IOLoop.instance().start()
+    if PYPY:
+        # pypy 不支持 gevent
+        server = httpserver.HTTPServer(app, xheaders=True)
+        server.listen(options.port, options.host)
+        ioloop.IOLoop.instance().start()
+    else:
+        import gevent.wsgi
+        # gevent may improve performance
+        server = gevent.wsgi.WSGIServer((options.host, options.port), app)
+        server.serve_forever()
 
 
 if __name__ == "__main__":

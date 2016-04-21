@@ -120,7 +120,6 @@ class HTTPData(object):
             _id = yield fs.put(content, content_type=content_type)
             logger.debug(_id)
         else:
-            # TODO md5 may not safe to check content unique
             md5 = hashlib.md5(content.getvalue()).hexdigest()
             # file_name = hashlib.sha1(content.getvalue()).digest().encode("base64").rstrip('\n')
             # TODO 并发情况下, 这里会出问题, 导致可能有相同md5的数据

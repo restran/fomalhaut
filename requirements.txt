@@ -1,8 +1,9 @@
+gevent
 future
 cerberus>=0.9
 requests
 tornado>=4.3
-motor>=0.5
+motor>=0.6
 redis
 pycrypto
 pycurl
