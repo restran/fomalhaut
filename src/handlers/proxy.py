@@ -21,6 +21,7 @@ class BackendAPIHandler(object):
     """
     处理代理请求
     """
+
     def __init__(self, handler, *args, **kwargs):
         self.post_data = {}
         self.handler = handler
@@ -55,9 +56,11 @@ class BackendAPIHandler(object):
         # 如果 header 有的是 str，有的是 unicode
         # 会出现 422 错误
         for name, value in headers.get_all():
-            # 过滤 x-api 开头的,这些只是发给 api-gateway
+            # 过滤 x-api 开头的, 这些只是发给 api-gateway
             l_name = name.lower()
-            if l_name.startswith('x-api-') and l_name != 'x-api-user-json':
+            # 这些 headers 需要传递给后端
+            required_headers = ['x-api-user-json', 'x-api-access-key']
+            if l_name.startswith('x-api-') and l_name not in required_headers:
                 pass
             # 不需要提供 Content-Length, 自动计算
             # 如果 Content-Length 不正确, 请求后端网站会出错,
@@ -109,7 +112,7 @@ class BackendAPIHandler(object):
                 self._on_proxy(x.response)
             else:
                 self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
-                logger.error(u'proxy failed for %s, error: %s' % (forward_url, x))
+                logger.error('proxy failed for %s, error: %s' % (forward_url, x))
         except Exception as e:
             logger.error(e)
             logger.error(traceback.format_exc())
@@ -120,7 +123,7 @@ class BackendAPIHandler(object):
         if response.error and not isinstance(
                 response.error, HTTPError):
             self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
-            logger.error(u'proxy failed for %s, error: %s' % (forward_url, response.error))
+            logger.error('proxy failed for %s, error: %s' % (forward_url, response.error))
             return
 
         try:
@@ -141,7 +144,7 @@ class BackendAPIHandler(object):
                 # 到了浏览器端会导致(failed)net::ERR_INVALID_CHUNKED_ENCODING
                 pass
             elif k == 'Location':
-                # API不存在304跳转,过滤Location
+                # API不存在301, 302跳转, 过滤Location
                 pass
             elif k == 'Content-Length':
                 # 代理传输过程如果采用了压缩，会导致remote传递过来的content-length与实际大小不符
@@ -162,8 +165,9 @@ class BackendAPIHandler(object):
 
         logger.debug("local response headers: %s" % self.handler._headers)
 
-        # 这里不直接 write,等到最后要finish的时候才write
-        # 因为在上一级的中间件中会对数据重新处理,比如加密
-        self.write(response.body)
-        self.analytics.result_code = ResultCode.OK
-        logger.info('proxy success for %s' % forward_url)
+        if response.code != 304:
+            # 如果 304 (Not Modified) 的话不能 write，因为在 finish() 中有检查
+            # assert not self._write_buffer, "Cannot send body with 304"
+            # 如果在 304 的时候仍然设置 body，有可能会导致客户端一直 pending 导致 502 bad gateway 错误
+            self.write(response.body)
+        logger.debug('proxy success for %s' % forward_url)

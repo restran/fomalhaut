@@ -191,9 +191,9 @@ class AnalyticsData(object):
         # 访问耗时
         self.elapsed = None
         # 返回结果的状态码
-        self.status_code = None
+        self.status_code = 200
         # API 访问结果代码
-        self.result_code = None
+        self.result_code = ResultCode.OK
         self.result_msg = ''
         self.request = HTTPRequestData()
         self.response = HTTPResponseData()

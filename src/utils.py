@@ -54,7 +54,7 @@ else:
 
 if PYPY:
     # curl_httpclient is faster than simple_httpclient however
-    # curl_httpclient needs pycurl which is not support in pypy
+    # curl_httpclient needs pycurl which is not supported in pypy
     from tornado.simple_httpclient import AsyncHTTPClient
 else:
     try:
