@@ -8,6 +8,7 @@ import json
 import logging
 
 import tornado.web
+from tornado import ioloop, httpserver
 from tornado.escape import native_str, json_decode
 from tornado.options import define, options
 
@@ -132,7 +133,7 @@ class ProtectedHandler(BaseHandler):
 
 
 if __name__ == '__main__':
-    tornado.options.parse_command_line()
+    options.parse_command_line()
     handlers = [
         (r'/login/?', LoginHandler),
         (r'/protected/?', ProtectedHandler),
@@ -141,9 +142,9 @@ if __name__ == '__main__':
     ]
     app = tornado.web.Application(handlers=handlers, debug=True)
     options.logging = native_str('DEBUG')
-    tornado.options.parse_command_line()
-    http_server = tornado.httpserver.HTTPServer(app, xheaders=True)
+    options.parse_command_line()
+    http_server = httpserver.HTTPServer(app, xheaders=True)
     http_server.listen(options.port, options.host)
 
     logger.info('api server is running on %s:%s' % (options.host, options.port))
-    tornado.ioloop.IOLoop.instance().start()
+    ioloop.IOLoop.instance().start()

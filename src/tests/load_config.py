@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 # created by restran on 2016/04/10
 from __future__ import unicode_literals, absolute_import
-import settings
+
 import redis
+
+import settings
 
 app_test = """{
     "access_key": "abcd",
