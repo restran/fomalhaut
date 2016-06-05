@@ -78,6 +78,8 @@ class HTTPData(object):
             else:
                 body_content = ''
 
+            # TODO 这里的 base64 编码有可能会出现异常
+            # UnicodeEncodeError: 'ascii' codec can't encode characters in position 15-16: ordinal not in range(128)
             j['body'] = b64encode(body_content)
 
         return j
