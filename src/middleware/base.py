@@ -5,7 +5,7 @@ from __future__ import unicode_literals, absolute_import
 import logging
 
 import settings
-from handlers.base import AuthRequestException, ClientBadConfigException
+from middleware.exceptions import AuthRequestException, ClientBadConfigException
 from utils import CacheConfigHandler
 
 logger = logging.getLogger(__name__)

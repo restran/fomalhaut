@@ -4,8 +4,8 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import os
 import logging.config
+import os
 
 # 当前目录所在路径
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))

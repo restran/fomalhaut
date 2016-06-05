@@ -10,6 +10,10 @@ from tornado.web import HTTPError
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['APIGatewayException', 'ClientErrorException', 'ServerErrorException',
+           'ClientBadConfigException', 'LoginAuthException', 'LoginAuthException',
+           'AuthRequestException']
+
 
 class APIGatewayException(HTTPError):
     pass

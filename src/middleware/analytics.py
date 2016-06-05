@@ -14,7 +14,6 @@ import motor
 from tornado import gen
 
 from middleware.base import BaseMiddleware
-from middleware.exceptions import *
 from settings import *
 from utils import utf8, BytesIO, RedisHelper
 

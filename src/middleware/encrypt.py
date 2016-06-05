@@ -13,8 +13,8 @@ from future.utils import iteritems
 from tornado.escape import json_decode
 from tornado.httputil import parse_qs_bytes
 
-from handlers.base import AuthRequestException, ServerErrorException
 from middleware.base import BaseMiddleware
+from middleware.exceptions import AuthRequestException, ServerErrorException
 from utils import AESCipher
 from utils import utf8, text_type
 

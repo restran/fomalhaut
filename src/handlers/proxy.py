@@ -6,6 +6,7 @@ from __future__ import unicode_literals, absolute_import
 
 import logging
 import traceback
+
 from tornado import gen
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.httputil import HTTPHeaders
@@ -143,9 +144,9 @@ class BackendAPIHandler(object):
                 # 如果设置了分块传输编码，但是实际上代理这边已经完整接收数据
                 # 到了浏览器端会导致(failed)net::ERR_INVALID_CHUNKED_ENCODING
                 pass
-            elif k == 'Location':
-                # API不存在301, 302跳转, 过滤Location
-                pass
+            # elif k == 'Location':
+            #     # API不存在301, 302跳转, 过滤Location
+            #     pass
             elif k == 'Content-Length':
                 # 代理传输过程如果采用了压缩，会导致remote传递过来的content-length与实际大小不符
                 # 会导致后面self.write(response.body)出现错误
@@ -163,7 +164,7 @@ class BackendAPIHandler(object):
             else:
                 self.set_header(k, v)
 
-        logger.debug("local response headers: %s" % self.handler._headers)
+        # logger.debug("local response headers: %s" % self.handler._headers)
 
         if response.code != 304:
             # 如果 304 (Not Modified) 的话不能 write，因为在 finish() 中有检查

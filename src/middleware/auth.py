@@ -3,22 +3,24 @@
 # created by restran on 2015/12/19
 
 from __future__ import unicode_literals, absolute_import
-import time
-import logging
+
 import hmac
-from hashlib import sha256, sha1
-import re
+import logging
 import random
-from tornado.escape import to_unicode
+import re
+import time
+from base64 import b64encode
+from hashlib import sha256, sha1
+
 from future.moves.urllib.parse import urlparse
 from future.utils import iteritems
+from tornado.escape import to_unicode
+
 import settings
-from handlers.base import AuthRequestException, ClientBadConfigException
-from utils import CacheConfigHandler, utf8, text_type, unicode_encoded_dict
-from middleware.base import BaseMiddleware, Client
-from cerberus import Validator
 from handlers.proxy import BackendAPIHandler
-from base64 import b64encode
+from middleware.base import BaseMiddleware, Client
+from middleware.exceptions import AuthRequestException
+from utils import utf8, text_type, unicode_encoded_dict
 
 logger = logging.getLogger(__name__)
 

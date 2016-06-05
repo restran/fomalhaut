@@ -4,12 +4,14 @@
 from __future__ import unicode_literals, absolute_import
 
 import logging
+
 from tornado import httpserver, ioloop, web
-from tornado.options import define, options
 from tornado.httputil import native_str
-from utils import RedisHelper, import_string, text_type
-from handlers.base import BaseHandler
+from tornado.options import define, options
+
 import settings
+from handlers.base import BaseHandler
+from utils import RedisHelper, import_string, text_type
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ import json
 import logging
 import traceback
 
-from handlers.base import LoginAuthException
+from middleware.exceptions import LoginAuthException
 from middleware.base import BaseMiddleware
 from utils import RedisHelper
 

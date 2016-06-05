@@ -3,16 +3,19 @@
 # created by restran on 2015/12/21
 
 from __future__ import unicode_literals, absolute_import
-import unittest
-from settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
-from handlers.endpoint import APIStatusCode
-from cerberus import Validator
-import requests
-from utils import *
+
 import json
-from tests.api_client import APIClient, APIRequest
 import logging
 import os
+import unittest
+
+import requests
+from cerberus import Validator
+
+from handlers.endpoint import APIStatusCode
+from settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
+from tests.api_client import APIClient, APIRequest
+from utils import *
 
 logger = logging.getLogger(__name__)
 

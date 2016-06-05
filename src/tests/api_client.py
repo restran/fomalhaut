@@ -3,19 +3,21 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import traceback
-import logging
+import hmac
 import json as json_util
+import logging
 import random
 import time
-import hmac
+import traceback
+from base64 import b64encode
 from hashlib import sha256, sha1
-from utils import utf8, utf8_encoded_dict, text_type, AESCipher, unicode_encoded_dict, to_unicode
+
+import requests
 from future.moves.urllib.parse import urlparse, urlunparse, urlencode
 from future.utils import iteritems, text_type
+
 from settings import SIGNATURE_EXPIRE_SECONDS, GATEWAY_ERROR_STATUS_CODE
-import requests
-from base64 import b64encode
+from utils import utf8, utf8_encoded_dict, text_type, AESCipher, unicode_encoded_dict, to_unicode
 
 logger = logging.getLogger(__name__)
 

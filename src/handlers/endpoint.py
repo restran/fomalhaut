@@ -12,8 +12,8 @@ from functools import wraps
 import cerberus
 from tornado import gen
 from tornado.concurrent import is_future
-from tornado.httpclient import HTTPRequest
 from tornado.escape import json_decode
+from tornado.httpclient import HTTPRequest
 
 from handlers.base import AuthRequestException
 from settings import GATEWAY_ERROR_STATUS_CODE, \

@@ -4,15 +4,11 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import tornado.httpserver
-import tornado.ioloop
+import json
+import logging
+
 import tornado.web
 from tornado.escape import native_str, json_decode
-import logging
-import json
-from future.utils import binary_type
-import tornado
-
 from tornado.options import define, options
 
 logging.basicConfig(level=logging.DEBUG)
