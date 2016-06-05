@@ -8,8 +8,8 @@ import logging
 import traceback
 
 from handlers.base import LoginAuthException
+from middleware.base import BaseMiddleware
 from utils import RedisHelper
-from middleware import BaseMiddleware
 
 logger = logging.getLogger(__name__)
 

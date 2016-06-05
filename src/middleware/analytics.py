@@ -4,17 +4,19 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import time
-from settings import *
-from middleware.exceptions import *
-from middleware import BaseMiddleware
-from tornado import gen
-import motor
 import hashlib
 import json
-from utils import utf8, BytesIO, RedisHelper
+import time
 from base64 import b64encode
 from datetime import datetime
+
+import motor
+from tornado import gen
+
+from middleware.base import BaseMiddleware
+from middleware.exceptions import *
+from settings import *
+from utils import utf8, BytesIO, RedisHelper
 
 logger = logging.getLogger(__name__)
 
