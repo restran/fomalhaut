@@ -1,6 +1,7 @@
 # API Gateway
 
 [![travis-ci](https://travis-ci.org/restran/api-gateway.svg?branch=master)](https://travis-ci.org/restran/api-gateway)
+[![Coverage Status](https://coveralls.io/repos/github/restran/api-gateway/badge.svg?branch=master)](https://coveralls.io/github/restran/api-gateway?branch=master)
 
 This project is still in development, api may change anytime. If you want to use it, fix what you need.
 
