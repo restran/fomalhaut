@@ -4,11 +4,9 @@ from __future__ import unicode_literals, absolute_import
 
 import logging
 
-from tornado.util import ObjectDict
-
 from .. import settings
 from ..middleware.exceptions import AuthRequestException, ClientBadConfigException
-from ..utils import CachedConfigHandler
+from ..utils import CachedConfigHandler, ObjectDict
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +96,7 @@ class Client(object):
         self.secret_key = None
         logger.debug(self.access_key)
         self.config = ObjectDict()
-        self.request = ObjectDict()
+        self.request = ObjectDict(endpoint=None, forward_url='', uri='')
         self.raw_uri = request.uri
         self.get_client_config()
 

@@ -67,6 +67,20 @@ else:
 copy_list = (lambda lb: copy(lb) if lb else [])
 
 
+class ObjectDict(dict):
+    """Makes a dictionary behave like an object, with attribute-style access.
+    """
+
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            return None
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
 def import_string(dotted_path):
     """
     Import a dotted module path and return the attribute/class designated by the
@@ -167,7 +181,7 @@ def new_random_token():
     to_hash = UniqueId.new_object_id() + text_type(random.random())
     token = hashlib.sha1(utf8(to_hash)).digest()
     # 不能用 base64 因为有些字符不能用在 url 上, 比如 + 号会变成空格, 导致 access_token 作为 url 的参数时会出错
-    token = to_unicode(urlsafe_b64encode(token).rstrip('='))
+    token = to_unicode(urlsafe_b64encode(token).rstrip(b'='))
     logger.debug(token)
     return token
 
