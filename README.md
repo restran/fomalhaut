@@ -59,7 +59,7 @@ MONGO_DBNAME = 'api_gateway'
 
 运行
 
-    python runserver.py
+    python -m beluga.runserver --port=6500
 
 ## 相关项目
 
