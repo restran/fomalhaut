@@ -4,7 +4,7 @@ from __future__ import unicode_literals, absolute_import
 
 import redis
 
-import settings
+from .. import settings
 
 app_test = """{
     "access_key": "abcd",
