@@ -3,10 +3,10 @@
 from __future__ import unicode_literals, absolute_import
 
 import logging
-
+from tornado.util import ObjectDict
 import settings
 from middleware.exceptions import AuthRequestException, ClientBadConfigException
-from utils import CacheConfigHandler
+from utils import CachedConfigHandler
 
 logger = logging.getLogger(__name__)
 
@@ -95,13 +95,13 @@ class Client(object):
             'X-Api-Access-Key', settings.DEFAULT_PUBLIC_APP_ACCESS_KEY)
         self.secret_key = None
         logger.debug(self.access_key)
-        self.config = {}
-        self.request = {}
+        self.config = ObjectDict()
+        self.request = ObjectDict()
         self.raw_uri = request.uri
         self.get_client_config()
 
     def get_client_config(self):
-        config_data = CacheConfigHandler.get_client_config(self.access_key)
+        config_data = CachedConfigHandler.get_client_config(self.access_key)
         if config_data is None:
             raise ClientBadConfigException('No Client Config')
         else:
@@ -124,7 +124,7 @@ class Client(object):
         #     k = '%s:%s' % (endpoint['name'], endpoint['version'])
         #     config_data['endpoints'][k] = endpoint
 
-        self.config = config_data
+        self.config = ObjectDict(**config_data)
 
 
 class BaseMiddleware(object):

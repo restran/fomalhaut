@@ -52,7 +52,7 @@ class BackendAPIHandler(object):
         """
         headers = self.request.headers
         # 更新host字段为后端访问网站的host
-        headers['Host'] = self.client.request['endpoint']['netloc']
+        headers['Host'] = self.client.request.endpoint['netloc']
         new_headers = HTTPHeaders()
         # 如果 header 有的是 str，有的是 unicode
         # 会出现 422 错误
@@ -75,7 +75,7 @@ class BackendAPIHandler(object):
 
     @gen.coroutine
     def _do_fetch(self, method):
-        forward_url = self.client.request['forward_url']
+        forward_url = self.client.request.forward_url
         # TODO 执行了 AES 加密请求后, 这里的 forward_url 就为 None
         logger.debug('请求的后端网站 %s' % forward_url)
         logger.debug('原始的 headers %s' % self.request.headers)
@@ -120,7 +120,7 @@ class BackendAPIHandler(object):
             self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR
 
     def _on_proxy(self, response):
-        forward_url = self.client.request['forward_url']
+        forward_url = self.client.request.forward_url
         if response.error and not isinstance(
                 response.error, HTTPError):
             self.analytics.result_code = ResultCode.REQUEST_ENDPOINT_ERROR

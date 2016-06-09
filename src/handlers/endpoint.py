@@ -142,13 +142,13 @@ class AuthLoginHandler(BuiltinAPIHandler):
     @gen.coroutine
     def post(self, *args, **kwargs):
         logger.debug('AuthLoginHandler')
-        login_auth_url = self.client.config.get('login_auth_url')
+        login_auth_url = self.client.config.login_auth_url
         logger.debug(login_auth_url)
         if login_auth_url is None:
             raise AuthRequestException('Missing Login Auth Url in Client Config')
         # access_token 多少秒后过期
-        access_token_ex = self.client.config.get('access_token_ex')
-        refresh_token_ex = self.client.config.get('refresh_token_ex')
+        access_token_ex = self.client.config.access_token_ex
+        refresh_token_ex = self.client.config.refresh_token_ex
 
         # 设置超时时间
         async_http_connect_timeout = ASYNC_HTTP_CONNECT_TIMEOUT
@@ -225,8 +225,8 @@ class AuthTokenHandler(BuiltinAPIHandler):
     def post(self, *args, **kwargs):
         refresh_token = self.post_data['refresh_token']
         token_info = RedisHelper.get_refresh_token_info(refresh_token)
-        access_token_ex = self.client.config.get('access_token_ex')
-        refresh_token_ex = self.client.config.get('refresh_token_ex')
+        access_token_ex = self.client.config.access_token_ex
+        refresh_token_ex = self.client.config.refresh_token_ex
         if token_info:
             RedisHelper.clear_token_info(refresh_token=refresh_token)
             token_info = RedisHelper.set_token_info(

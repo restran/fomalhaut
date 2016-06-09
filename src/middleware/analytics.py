@@ -293,14 +293,15 @@ class AnalyticsHandler(BaseMiddleware):
 
         client = self.handler.client
         if client is not None:
-            analytics.client_name = client.config.get('name')
-            analytics.client_id = client.config.get('id')
-            endpoint = client.request.get('endpoint', {})
-            analytics.endpoint_name = endpoint.get('name')
-            analytics.endpoint_id = endpoint.get('id')
-            analytics.version = endpoint.get('version')
-            analytics.is_builtin = endpoint.get('is_builtin', False)
-            analytics.forward_url = client.request.get('forward_url')
+            analytics.client_name = client.config.name
+            analytics.client_id = client.config.id
+            analytics.forward_url = client.request.forward_url
+            endpoint = client.request.endpoint
+            if endpoint is not None:
+                analytics.endpoint_name = endpoint.get('name')
+                analytics.endpoint_id = endpoint.get('id')
+                analytics.version = endpoint.get('version')
+                analytics.is_builtin = endpoint.get('is_builtin', False)
 
         # db = self.handler.settings['db']
         # 将统计数据存储在 MongoDB 中, 性能较差

@@ -30,7 +30,7 @@ import settings
 __all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
            'json_loads', 'new_random_token', 'json_decode', 'AsyncHTTPClient',
-           'CacheConfigHandler']
+           'CachedConfigHandler']
 
 logger = logging.getLogger(__name__)
 
@@ -182,25 +182,43 @@ def json_loads(data):
     return None
 
 
-class CacheConfigHandler(object):
+class CachedConfigHandler(object):
     """
-    带有缓存的配置读取
+    带有缓存的配置读取, 避免频繁访问时, 需要重复去 redis 读取配置
     """
     _cached_config = {}
+    _last_clear_ts = 0
+    _clear_time = 1000 * settings.CONFIG_CACHE_EXPIRE_SECONDS
 
     @classmethod
     def get_client_config(cls, access_key):
-        config = cls._cached_config.get(access_key)
         now_ts = int(time.time())
+        cls._clear_expired_config(now_ts)
+
+        config = cls._cached_config.get(access_key)
         if config:
             ts = config['ts']
-            now_ts = int(time.time())
             if now_ts - ts <= settings.CONFIG_CACHE_EXPIRE_SECONDS:
                 return config['data']
 
         config_data = RedisHelper.get_client_config(access_key)
         cls._cached_config[access_key] = {'ts': now_ts, 'data': config_data}
         return config_data
+
+    @classmethod
+    def _clear_expired_config(cls, now_ts):
+        """
+        避免因为 access_key 更新太多次, 导致有大量无效的数据
+        :param now_ts:
+        :return:
+        """
+        if now_ts - cls._last_clear_ts > cls._clear_time:
+            cls._cached_config = {
+                k: v
+                for k, v in iteritems(cls._cached_config)
+                if now_ts - v['ts'] <= settings.CONFIG_CACHE_EXPIRE_SECONDS
+                }
+            cls._last_clear_ts = now_ts
 
 
 class RedisHelper(object):

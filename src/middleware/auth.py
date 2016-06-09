@@ -165,9 +165,7 @@ class PrepareAuthHandler(BaseMiddleware):
         if not endpoint.get('enable', True):
             raise AuthRequestException('Disabled Endpoint')
 
-        self.handler.client.request = {
-            'endpoint': endpoint,
-        }
+        self.handler.client.request.endpoint = endpoint
 
 
 class HMACAuthenticateHandler(BaseMiddleware):
@@ -177,7 +175,7 @@ class HMACAuthenticateHandler(BaseMiddleware):
         """
         logger.debug('process_request')
         # self.handler.client = Client(self.handler.request)
-        endpoint = self.handler.client.request['endpoint']
+        endpoint = self.handler.client.request.endpoint
         # 判断是否需要进行 HMAC 签名校验
         if endpoint.get('enable_hmac', True):
             auth_handler = HMACHandler(self.handler.client)
@@ -231,7 +229,7 @@ class ParseEndpointHandler(BaseMiddleware):
         except ValueError:
             raise AuthRequestException('Invalid Request Uri, Fail to Get Endpoint and Version')
 
-        endpoint = self.handler.client.request['endpoint']
+        endpoint = self.handler.client.request.endpoint
 
         if not uri.startswith('/'):
             uri = '/' + uri
@@ -269,8 +267,8 @@ class ParseEndpointHandler(BaseMiddleware):
             else:
                 forward_url = endpoint_url + uri
 
-        self.handler.client.request['uri'] = uri
-        self.handler.client.request['forward_url'] = forward_url
+        self.handler.client.request.uri = uri
+        self.handler.client.request.forward_url = forward_url
 
     def _acl_filter(self):
         """
@@ -278,9 +276,8 @@ class ParseEndpointHandler(BaseMiddleware):
         :return:
         """
         client = self.handler.client
-        uri = client.request['uri']
-
-        endpoint = client.request['endpoint']
+        uri = client.request.uri
+        endpoint = client.request.endpoint
         enable_acl = endpoint.get('enable_acl', False)
         if enable_acl:
             acl_rules = endpoint.get('acl_rules', [])

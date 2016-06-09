@@ -24,7 +24,7 @@ class AuthAccessTokenHandler(BaseMiddleware):
         if 'X-Api-User-Json' in self.handler.request.headers:
             del self.handler.request.headers['X-Api-User-Json']
 
-        endpoint = self.handler.client.request['endpoint']
+        endpoint = self.handler.client.request.endpoint
         require_login = endpoint.get('require_login', False)
         if not require_login:
             return
