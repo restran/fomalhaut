@@ -12,10 +12,10 @@ import unittest
 import requests
 from cerberus import Validator
 
-from handlers.endpoint import APIStatusCode
-from settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
-from tests.api_client import APIClient, APIRequest
-from utils import *
+from beluga.tests.api_client import APIClient, APIRequest
+from beluga.handlers.endpoint import APIStatusCode
+from beluga.settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
+from beluga.utils import *
 
 logger = logging.getLogger(__name__)
 

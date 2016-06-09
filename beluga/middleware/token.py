@@ -7,9 +7,9 @@ import json
 import logging
 import traceback
 
-from middleware.exceptions import LoginAuthException
-from middleware.base import BaseMiddleware
-from utils import RedisHelper
+from ..middleware.base import BaseMiddleware
+from ..middleware.exceptions import LoginAuthException
+from ..utils import RedisHelper
 
 logger = logging.getLogger(__name__)
 

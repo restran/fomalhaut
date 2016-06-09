@@ -10,6 +10,7 @@ python:
 
 install:
   - pip install -r requirements.txt
+  - pip install coveralls
 
 services:
   - mongodb
@@ -17,13 +18,16 @@ services:
 before_script:
   - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
   - sleep 5
-  - cd src
-  - python -m tests.load_config
+  - python -m beluga.tests.load_config
   - sleep 3
-  - python runserver.py &
+  - python -m beluga.runserver &
   - sleep 3
-  - python ./tests/api_server.py &
+  - python -m beluga.tests.api_server &
   - sleep 3
 
 script:
-  - python -m tests.auth
+#  - python -m unittest discover -s beluga -p "*_test.py"
+  - coverage run --source=beluga -m unittest discover -s beluga -p "*_test.py"
+
+after_success:
+  coveralls

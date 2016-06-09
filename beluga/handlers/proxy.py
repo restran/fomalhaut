@@ -11,9 +11,9 @@ from tornado import gen
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.httputil import HTTPHeaders
 
-import settings
-from middleware.analytics import ResultCode
-from utils import text_type, AsyncHTTPClient
+from .. import settings
+from ..middleware.analytics import ResultCode
+from ..utils import text_type, AsyncHTTPClient
 
 logger = logging.getLogger(__name__)
 

@@ -16,11 +16,11 @@ from future.moves.urllib.parse import urlparse
 from future.utils import iteritems
 from tornado.escape import to_unicode
 
-import settings
-from handlers.proxy import BackendAPIHandler
-from middleware.base import BaseMiddleware, Client
-from middleware.exceptions import AuthRequestException
-from utils import utf8, text_type, unicode_encoded_dict
+from .. import settings
+from ..handlers.proxy import BackendAPIHandler
+from ..middleware.base import BaseMiddleware, Client
+from ..middleware.exceptions import AuthRequestException
+from ..utils import utf8, text_type, unicode_encoded_dict
 
 logger = logging.getLogger(__name__)
 

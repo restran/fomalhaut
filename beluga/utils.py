@@ -25,7 +25,7 @@ from future.builtins import chr
 from future.utils import iteritems
 from tornado.escape import json_decode, utf8, to_unicode
 
-import settings
+from . import settings
 
 __all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',

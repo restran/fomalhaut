@@ -3,10 +3,12 @@
 from __future__ import unicode_literals, absolute_import
 
 import logging
+
 from tornado.util import ObjectDict
-import settings
-from middleware.exceptions import AuthRequestException, ClientBadConfigException
-from utils import CachedConfigHandler
+
+from .. import settings
+from ..middleware.exceptions import AuthRequestException, ClientBadConfigException
+from ..utils import CachedConfigHandler
 
 logger = logging.getLogger(__name__)
 

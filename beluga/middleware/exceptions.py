@@ -5,8 +5,10 @@
 from __future__ import unicode_literals, absolute_import
 
 import logging
-from settings import GATEWAY_ERROR_STATUS_CODE
+
 from tornado.web import HTTPError
+
+from ..settings import GATEWAY_ERROR_STATUS_CODE
 
 logger = logging.getLogger(__name__)
 

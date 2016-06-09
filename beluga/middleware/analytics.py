@@ -13,9 +13,9 @@ from datetime import datetime
 import motor
 from tornado import gen
 
-from middleware.base import BaseMiddleware
-from settings import *
-from utils import utf8, BytesIO, RedisHelper
+from ..middleware.base import BaseMiddleware
+from ..settings import *
+from ..utils import utf8, BytesIO, RedisHelper
 
 logger = logging.getLogger(__name__)
 

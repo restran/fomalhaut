@@ -15,10 +15,10 @@ from tornado.concurrent import is_future
 from tornado.escape import json_decode
 from tornado.httpclient import HTTPRequest
 
-from handlers.base import AuthRequestException
-from settings import GATEWAY_ERROR_STATUS_CODE, \
+from ..handlers.base import AuthRequestException
+from ..settings import GATEWAY_ERROR_STATUS_CODE, \
     ASYNC_HTTP_CONNECT_TIMEOUT, ASYNC_HTTP_REQUEST_TIMEOUT
-from utils import RedisHelper, AsyncHTTPClient
+from ..utils import RedisHelper, AsyncHTTPClient
 
 logger = logging.getLogger(__name__)
 

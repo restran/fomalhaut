@@ -9,9 +9,9 @@ from tornado import httpserver, ioloop, web
 from tornado.httputil import native_str
 from tornado.options import define, options
 
-import settings
-from handlers.base import BaseHandler
-from utils import RedisHelper, import_string, text_type
+from . import settings
+from .handlers.base import BaseHandler
+from .utils import RedisHelper, import_string, text_type
 
 logger = logging.getLogger(__name__)
 

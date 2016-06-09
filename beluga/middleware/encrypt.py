@@ -13,10 +13,9 @@ from future.utils import iteritems
 from tornado.escape import json_decode
 from tornado.httputil import parse_qs_bytes
 
-from middleware.base import BaseMiddleware
-from middleware.exceptions import AuthRequestException, ServerErrorException
-from utils import AESCipher
-from utils import utf8, text_type
+from ..middleware.base import BaseMiddleware
+from ..middleware.exceptions import AuthRequestException, ServerErrorException
+from ..utils import AESCipher, utf8, text_type
 
 logger = logging.getLogger(__name__)
 

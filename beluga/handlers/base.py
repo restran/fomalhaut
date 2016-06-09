@@ -14,11 +14,10 @@ from tornado.concurrent import is_future
 from tornado.httputil import HTTPHeaders
 from tornado.web import RequestHandler
 
-from middleware.analytics import AnalyticsData
-from middleware.analytics import ResultCode
-from middleware.exceptions import *
-from settings import GATEWAY_ERROR_STATUS_CODE
-from utils import text_type, copy_list
+from ..middleware.analytics import AnalyticsData, ResultCode
+from ..middleware.exceptions import *
+from ..settings import GATEWAY_ERROR_STATUS_CODE
+from ..utils import text_type, copy_list
 
 logger = logging.getLogger(__name__)
 

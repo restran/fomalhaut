@@ -21,12 +21,12 @@ AUTO_RELOAD = True if DEBUG else False
 
 # 中间件会按顺序执行
 MIDDLEWARE_CLASSES = [
-    'middleware.analytics.AnalyticsHandler',
-    'middleware.auth.PrepareAuthHandler',
-    'middleware.auth.HMACAuthenticateHandler',
-    'middleware.encrypt.EncryptHandler',
-    'middleware.auth.ParseEndpointHandler',
-    'middleware.token.AuthAccessTokenHandler',
+    'beluga.middleware.analytics.AnalyticsHandler',
+    'beluga.middleware.auth.PrepareAuthHandler',
+    'beluga.middleware.auth.HMACAuthenticateHandler',
+    'beluga.middleware.encrypt.EncryptHandler',
+    'beluga.middleware.auth.ParseEndpointHandler',
+    'beluga.middleware.token.AuthAccessTokenHandler',
 ]
 
 # api-gateway 内置的 API Endpoint
@@ -37,9 +37,9 @@ BUILTIN_ENDPOINTS = [
             'version': 'v1'
         },
         'handlers': [
-            (r'/login/?', 'handlers.endpoint.AuthLoginHandler'),
-            (r'/logout/?', 'handlers.endpoint.AuthLogoutHandler'),
-            (r'/token/?', 'handlers.endpoint.AuthTokenHandler')
+            (r'/login/?', 'beluga.handlers.endpoint.AuthLoginHandler'),
+            (r'/logout/?', 'beluga.handlers.endpoint.AuthLogoutHandler'),
+            (r'/token/?', 'beluga.handlers.endpoint.AuthTokenHandler')
         ]
     }
 ]
