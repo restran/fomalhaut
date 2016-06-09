@@ -1,7 +1,9 @@
-# API Gateway
+# Beluga
 
 [![travis-ci](https://travis-ci.org/restran/api-gateway.svg?branch=master)](https://travis-ci.org/restran/api-gateway)
 [![Coverage Status](https://coveralls.io/repos/github/restran/api-gateway/badge.svg?branch=master)](https://coveralls.io/github/restran/api-gateway?branch=master)
+
+Beluga is an api gateway acts as the frontend and api router for numerous backend json api servers.
 
 This project is still in development, api may change anytime. If you want to use it, fix what you need.
 
@@ -11,7 +13,7 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 2. 如何控制不同 App 对多种多样 API 的访问权限？
 3. API 的访问情况怎样，日志如何查看？
 
-于是，就有了 API Gateway 这个项目。
+于是，就有了 Beluga (API Gateway) 这个项目。
 
 ## 类似项目
 
