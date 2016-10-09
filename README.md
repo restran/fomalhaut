@@ -27,7 +27,7 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 
 需要先安装 Redis 和 MongoDB，相应的依赖包可以通过以下命令安装:
 
-    pip install -r requirement.txt
+    pip install -r requirements.txt
 
 
 ## 运行
