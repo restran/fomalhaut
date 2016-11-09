@@ -10,7 +10,6 @@ import time
 from base64 import b64encode
 from datetime import datetime
 
-import motor
 from tornado import gen
 
 from ..middleware.base import BaseMiddleware
@@ -114,30 +113,6 @@ class HTTPData(object):
                 db, '%s_%s' % (data_type, 'body'), content,
                 self.content_type, True)
             logger.debug(self.body_id)
-
-    @gen.coroutine
-    def write_file(self, db, collection, data, content_type='', hash_id=False):
-        fs = motor.motor_tornado.MotorGridFS(db, collection=collection)
-        content = BytesIO(utf8(data))
-        if not hash_id:
-            _id = yield fs.put(content, content_type=content_type)
-            logger.debug(_id)
-        else:
-            md5 = hashlib.md5(content.getvalue()).hexdigest()
-            # file_name = hashlib.sha1(content.getvalue()).digest().encode("base64").rstrip('\n')
-            # TODO 并发情况下, 这里会出问题, 导致可能有相同md5的数据
-            grid_out = yield fs.find_one({'md5': md5})
-            if not grid_out:
-                _id = yield fs.put(content, content_type=content_type)
-            else:
-                _id = grid_out._id
-
-            # 直接让引用计数的 _id 等于 file 的 _id
-            logger.debug(_id)
-            logger.debug(collection)
-            yield db['ref_%s' % collection].update({'_id': _id}, {'$inc': {'count': 1}}, upsert=True)
-
-        raise gen.Return(_id)
 
 
 class HTTPRequestData(HTTPData):

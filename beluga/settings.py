@@ -107,6 +107,11 @@ ASYNC_HTTP_CONNECT_TIMEOUT = 20.0
 # 整个请求的时间
 ASYNC_HTTP_REQUEST_TIMEOUT = 20.0
 
+# 用来配置 ASYNC_HTTP_CLIENT 最大并发请求数量
+# 如果后端网站响应很慢，就可能占用连接数，导致其他网站的代理也跟着慢
+# 因此需要设置一个足够大的并发数量，默认是10
+ASYNC_HTTP_CLIENT_MAX_CLIENTS = 500
+
 if not os.path.exists(LOG_PATH):
     # 创建日志文件夹
     os.makedirs(LOG_PATH)

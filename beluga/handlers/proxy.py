@@ -11,7 +11,9 @@ from tornado import gen
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.httputil import HTTPHeaders
 
-from .. import settings
+from ..settings import ASYNC_HTTP_CONNECT_TIMEOUT, \
+    ASYNC_HTTP_REQUEST_TIMEOUT, \
+    ASYNC_HTTP_CLIENT_MAX_CLIENTS
 from ..middleware.analytics import ResultCode
 from ..utils import text_type, AsyncHTTPClient
 
@@ -90,15 +92,15 @@ class BackendAPIHandler(object):
             else:
                 body = self.request.body
 
+            config = self.client.config
             # 设置超时时间
-            async_http_connect_timeout = self.client.config.get(
-                'async_http_connect_timeout',
-                settings.ASYNC_HTTP_CONNECT_TIMEOUT)
-            async_http_request_timeout = self.client.config.get(
-                'async_http_request_timeout',
-                settings.ASYNC_HTTP_REQUEST_TIMEOUT)
+            async_http_connect_timeout = config.get(
+                'async_http_connect_timeout', ASYNC_HTTP_CONNECT_TIMEOUT)
+            async_http_request_timeout = config.get(
+                'async_http_request_timeout', ASYNC_HTTP_REQUEST_TIMEOUT)
 
-            response = yield AsyncHTTPClient().fetch(
+            response = yield AsyncHTTPClient(
+                max_clients=ASYNC_HTTP_CLIENT_MAX_CLIENTS).fetch(
                 HTTPRequest(url=forward_url,
                             method=method,
                             body=body,
