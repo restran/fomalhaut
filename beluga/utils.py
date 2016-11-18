@@ -299,7 +299,7 @@ class RedisHelper(object):
         if access_token:
             token_info = cls.get_access_token_info(access_token)
         elif refresh_token:
-            token_info = cls.get_access_token_info(refresh_token)
+            token_info = cls.get_refresh_token_info(refresh_token)
         else:
             return
 
