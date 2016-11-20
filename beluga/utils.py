@@ -306,7 +306,7 @@ class RedisHelper(object):
         if token_info:
             k_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
             k_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
-            cls.get_client().delete([k_a, k_r])
+            cls.get_client().delete(k_a, k_r)
 
     @classmethod
     def set_token_info(cls, token_info, access_token_ex, refresh_token_ex):
