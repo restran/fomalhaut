@@ -65,7 +65,7 @@ install:
   - pip install -r requirements.txt
   - pip install coveralls
   - |
-    py_35=`python -c "import sys;v=sys.version_info;print(v[0]==3 and v[1]>=5)"`
+    py_35=`python -c "import sys;v=sys.version_info;print(v[0]==3 and v[1]>=5 and getattr(sys,'pypy_version_info',None))"`
     if [ $py_35 == 'True' ]; then
         pip install uvloop
     fi

@@ -12,7 +12,7 @@ from tornado.web import RequestHandler
 
 from fomalhaut import settings
 from fomalhaut.handlers.base import BaseHandler
-from fomalhaut.utils import RedisHelper, import_string, text_type
+from fomalhaut.utils import RedisHelper, import_string, text_type, PYPY
 
 logger = logging.getLogger(__name__)
 
@@ -103,14 +103,14 @@ def main():
     server.listen(options.port, options.host)
     logger.info('fomalhaut is running on %s:%s' % (options.host, options.port))
 
-    py_version = sys.version_info
-    if py_version[0] == 3 and py_version[1] >= 5:
+    if sys.version_info >= (3, 5) and not PYPY:
         # python 3.5 以上版本，可以使用 uvloop 来加速
         # https://github.com/MagicStack/uvloop/issues/35
         from tornado.platform.asyncio import AsyncIOMainLoop
         import asyncio
         try:
             import uvloop
+            logger.info('use uvloop as ioloop')
             asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
             AsyncIOMainLoop().install()
             asyncio.get_event_loop().run_forever()
