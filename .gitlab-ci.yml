@@ -51,6 +51,6 @@ test:pypy:
   - pypy -m fomalhaut.tests.api_server &
   - sleep 2
   script:
-  - pypy -m unittest discover -s fomalhaut -p "*_test.py"
+  - pypy -m unittest discover -s fomalhaut -p "test_*.py"
   # 测试覆盖率
   - py.test --cov-config .coveragerc --cov=fomalhaut

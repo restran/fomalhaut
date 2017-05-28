@@ -4,7 +4,7 @@ cerberus>=0.9
 requests
 tornado>=4.3
 redis
-pycrypto
+cryptography
 pycurl
 ConcurrentLogHandler
 pymongo

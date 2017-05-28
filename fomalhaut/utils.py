@@ -20,8 +20,8 @@ from copy import copy
 from importlib import import_module
 import ujson
 import redis
-from Crypto import Random
-from Crypto.Cipher import AES
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 from bson.objectid import ObjectId
 from future.builtins import chr
 from future.utils import iteritems
@@ -164,7 +164,7 @@ def time_elapsed(message=''):
 
 
 class PKCS7Padding(object):
-    def __init__(self, block_size=AES.block_size):
+    def __init__(self, block_size=16):
         self.bs = block_size
 
     def pad(self, s):
@@ -179,8 +179,8 @@ class AESCipher(object):
     http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
     """
 
-    def __init__(self, key):
-        self.bs = 16
+    def __init__(self, key, block_size=16):
+        self.bs = block_size
         self.key = hashlib.sha256(key.encode()).digest()
         self.padding = PKCS7Padding(self.bs)
 
@@ -188,25 +188,33 @@ class AESCipher(object):
         raw = self.padding.pad(utf8(raw))
         # AES.block_size 长度是16
         # 每次加密都随机生成一个16个字节的IV
-        iv = Random.new().read(AES.block_size)
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-
+        # iv = Random.new().read(AES.block_size)
+        iv = os.urandom(self.bs)
+        # cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        backend = default_backend()
+        cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv), backend=backend)
         # IV 保存在加密后的文本的开头
         # IV是一个随机的分组，每次会话加密时都要使用一个新的随机IV，
         # IV无须保密，但一定是不可预知的。由于IV的随机性，IV将使得后续的密文分组都因为IV而随机化
         # https://www.zhihu.com/question/26437065
-        return to_unicode(base64.b64encode(iv + cipher.encrypt(raw)))
+        encryptor = cipher.encryptor()
+        ct = encryptor.update(raw) + encryptor.finalize()
+        return to_unicode(base64.b64encode(iv + ct))
 
     def decrypt(self, enc):
         # logger.debug(type(enc))
         enc = base64.b64decode(utf8(enc))
         # AES.block_size 长度是16
-        iv = enc[:AES.block_size]
-        cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        plain = self.padding.unpad(cipher.decrypt(enc[AES.block_size:]))
+        iv = enc[:self.bs]
+        backend = default_backend()
+        cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv), backend=backend)
+        decryptor = cipher.decryptor()
+        plain = decryptor.update(enc[self.bs:]) + decryptor.finalize()
+        # cipher = AES.new(self.key, AES.MODE_CBC, iv)
+        plain = self.padding.unpad(plain)
         try:
             # 如果是字节流, 比如图片, 无法用 utf-8 编码解码成 unicode 的字符串
-            return plain.decode('utf-8')
+            return to_unicode(plain)
         except Exception as e:
             logger.debug(e)
             return plain
