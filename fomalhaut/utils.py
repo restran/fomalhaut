@@ -55,7 +55,8 @@ if PY3:
     text_type = str
     binary_type = bytes
 else:
-
+    from cStringIO import StringIO as BytesIO
+    
     text_type = unicode
     binary_type = str
 

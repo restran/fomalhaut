@@ -2,11 +2,10 @@
 # Created on 2016/5/27
 from __future__ import unicode_literals, absolute_import
 
-# from .zh_Hans import PromptMessage
-from ..utils import import_string
+from fomalhaut.utils import import_string
 
 try:
-    from ..settings import LANGUAGE
+    from fomalhaut.settings import LANGUAGE
 except:
     LANGUAGE = 'zh-Hans'
 

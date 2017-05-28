@@ -8,3 +8,4 @@ pycrypto
 pycurl
 ConcurrentLogHandler
 pymongo
+ujson
