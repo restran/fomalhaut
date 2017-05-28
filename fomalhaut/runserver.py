@@ -102,6 +102,7 @@ def main():
     server = httpserver.HTTPServer(app, xheaders=True)
     server.listen(options.port, options.host)
     logger.info('fomalhaut is running on %s:%s' % (options.host, options.port))
+    # ioloop.IOLoop.instance().start()
 
     if sys.version_info >= (3, 5) and not PYPY:
         # python 3.5 以上版本，可以使用 uvloop 来加速

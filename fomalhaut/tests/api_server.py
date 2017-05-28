@@ -82,7 +82,7 @@ class SleepHandler(BaseHandler):
         content_type = self.request.headers.get('Content-Type')
         if content_type:
             self.set_header('Content-Type', content_type)
-        yield gen.sleep(1)
+        yield gen.sleep(0.5)
         self.write('get')
 
 
