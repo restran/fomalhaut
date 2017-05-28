@@ -76,16 +76,19 @@ services:
 before_script:
   - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
   - sleep 1
-  - python -m fomalhaut.tests.load_config
+  - coverage run -p -m fomalhaut.tests.load_config
   - sleep 1
-  - python -m fomalhaut.runserver &
+  - coverage run -p -m fomalhaut.runserver &
   - sleep 1
-  - python -m fomalhaut.tests.api_server &
+  - coverage run -p -m fomalhaut.tests.api_server &
   - sleep 1
 
 script:
 #  - python -m unittest discover -s fomalhaut -p "*_test.py"
-  - coverage run --source=fomalhaut -m unittest discover -s fomalhaut -p "test_*.py"
+  - coverage run -p --source=fomalhaut -m unittest discover -s fomalhaut -p "test_*.py"
 
 after_success:
-  coveralls
+  - coverage run -p -m fomalhaut.tests.stop_server
+  - coverage combine
+  - coverage report
+  - coveralls

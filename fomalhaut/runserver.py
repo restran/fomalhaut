@@ -5,6 +5,9 @@ from __future__ import unicode_literals, absolute_import
 
 import logging
 import sys
+import signal
+import tornado
+import time
 from tornado import httpserver, ioloop, web
 from tornado.httputil import native_str
 from tornado.options import define, options
@@ -15,6 +18,8 @@ from fomalhaut.handlers.base import BaseHandler
 from fomalhaut.utils import RedisHelper, import_string, text_type, PYPY
 
 logger = logging.getLogger(__name__)
+
+MAX_WAIT_SECONDS_BEFORE_SHUTDOWN = 1
 
 define("host", default=settings.HOST, help="run on the given host", type=str)
 define("port", default=settings.PORT, help="run on the given port", type=int)
@@ -83,6 +88,31 @@ class Application(web.Application):
                      '\n'.join([text_type(m) for m in self.middleware_list]))
 
 
+def sig_handler(sig, frame):
+    logging.warning('caught signal: %s', sig)
+    tornado.ioloop.IOLoop.instance().add_callback(shutdown)
+
+
+def shutdown():
+    logging.info('stopping http server')
+    server.stop()
+
+    logging.info('will shutdown in %s seconds...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
+    io_loop = tornado.ioloop.IOLoop.instance()
+
+    deadline = time.time() + MAX_WAIT_SECONDS_BEFORE_SHUTDOWN
+
+    def stop_loop():
+        now = time.time()
+        if now < deadline and (io_loop._callbacks or io_loop._timeouts):
+            io_loop.add_timeout(now + 1, stop_loop)
+        else:
+            io_loop.stop()
+            logging.info('shutdown')
+
+    stop_loop()
+
+
 def main():
     # 重新设置一下日志级别，默认情况下，tornado 是 info
     # py2 下 options.logging 不能是 Unicode
@@ -98,10 +128,15 @@ def main():
     # 启动 tornado 之前，先测试 redis 是否能正常工作
     RedisHelper.ping_redis()
 
+    global server
     app = Application()
     server = httpserver.HTTPServer(app, xheaders=True)
     server.listen(options.port, options.host)
     logger.info('fomalhaut is running on %s:%s' % (options.host, options.port))
+
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
+
     # ioloop.IOLoop.instance().start()
 
     if sys.version_info >= (3, 5) and not PYPY:

@@ -3,4 +3,5 @@ logs/
 *.pyc
 .DS_Store
 .coverage
+.coverage.*
 .cache
