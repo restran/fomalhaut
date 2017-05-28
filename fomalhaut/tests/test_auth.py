@@ -9,12 +9,11 @@ import logging
 import os
 import unittest
 
-import requests
 from cerberus import Validator
 
-from fomalhaut.tests.api_client import APIClient, APIRequest
 from fomalhaut.handlers.endpoints.base import APIStatusCode
 from fomalhaut.settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
+from fomalhaut.tests.api_client import APIClient, APIRequest
 from fomalhaut.utils import *
 
 logger = logging.getLogger(__name__)

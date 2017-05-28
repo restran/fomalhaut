@@ -71,11 +71,11 @@ services:
 before_script:
   - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
   - sleep 3
-  - python -m fomalhaut.tests.load_config
+  - coverage run --source=fomalhaut -m fomalhaut.tests.load_config
   - sleep 3
-  - python -m fomalhaut.runserver &
+  - coverage run --source=fomalhaut -m fomalhaut.runserver &
   - sleep 3
-  - python -m fomalhaut.tests.api_server &
+  - coverage run --source=fomalhaut -m fomalhaut.tests.api_server &
   - sleep 3
 
 script:

@@ -6,23 +6,23 @@ from __future__ import unicode_literals, absolute_import
 
 import base64
 import hashlib
-import json
 import logging
 import os
 import random
 import sys
 import time
 import traceback
+import ujson
 import uuid
 from base64 import urlsafe_b64encode
 from concurrent.futures import ThreadPoolExecutor
 from copy import copy
 from importlib import import_module
-import ujson
+
 import redis
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
 from bson.objectid import ObjectId
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from future.builtins import chr
 from future.utils import iteritems
 from tornado.escape import json_decode, utf8, to_unicode, basestring_type
@@ -55,7 +55,6 @@ if PY3:
     text_type = str
     binary_type = bytes
 else:
-    from cStringIO import StringIO as BytesIO
 
     text_type = unicode
     binary_type = str
@@ -451,4 +450,9 @@ class RedisHelper(object):
 
 
 if __name__ == '__main__':
+    aes = AESCipher('123')
+    data = aes.encrypt('123')
+    print(data)
+    plain = aes.decrypt(data)
+    print(plain)
     pass

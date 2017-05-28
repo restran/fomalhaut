@@ -1,7 +1,7 @@
 # Fomalhaut
 
-[![travis-ci](https://travis-ci.org/restran/api-gateway.svg?branch=master)](https://travis-ci.org/restran/api-gateway)
-[![Coverage Status](https://coveralls.io/repos/github/restran/api-gateway/badge.svg?branch=master)](https://coveralls.io/github/restran/api-gateway?branch=master)
+[![travis-ci](https://travis-ci.org/restran/fomalhaut.svg?branch=master)](https://travis-ci.org/restran/fomalhaut)
+[![Coverage Status](https://coveralls.io/repos/github/restran/fomalhaut/badge.svg?branch=master)](https://coveralls.io/github/restran/fomalhaut?branch=master)
 
 fomalhaut is an api gateway acts as the frontend and api router for numerous backend json api servers.
 
@@ -147,4 +147,3 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 - [ ] Rate-Limiting
 - [ ] api-android-client
 - [ ] api-swift-client
-# api-gateway
