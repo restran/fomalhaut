@@ -4,7 +4,7 @@
 from __future__ import unicode_literals, absolute_import
 
 import logging
-
+import sys
 from tornado import httpserver, ioloop, web
 from tornado.httputil import native_str
 from tornado.options import define, options
@@ -102,7 +102,22 @@ def main():
     server = httpserver.HTTPServer(app, xheaders=True)
     server.listen(options.port, options.host)
     logger.info('fomalhaut is running on %s:%s' % (options.host, options.port))
-    ioloop.IOLoop.instance().start()
+
+    py_version = sys.version_info
+    if py_version[0] == 3 and py_version[1] >= 5:
+        # python 3.5 以上版本，可以使用 uvloop 来加速
+        # https://github.com/MagicStack/uvloop/issues/35
+        from tornado.platform.asyncio import AsyncIOMainLoop
+        import asyncio
+        try:
+            import uvloop
+            asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+            AsyncIOMainLoop().install()
+            asyncio.get_event_loop().run_forever()
+        except:
+            ioloop.IOLoop.instance().start()
+    else:
+        ioloop.IOLoop.instance().start()
 
 
 if __name__ == "__main__":

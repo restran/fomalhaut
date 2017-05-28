@@ -64,19 +64,24 @@ matrix:
 install:
   - pip install -r requirements.txt
   - pip install coveralls
+  - |
+    py_35=`python -c "import sys;v=sys.version_info;print(v[0]==3 and v[1]>=5)"`
+    if [ $py_35 == 'True' ]; then
+        pip install uvloop
+    fi
 
 services:
   - mongodb
 
 before_script:
   - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
-  - sleep 3
-  - coverage run --source=fomalhaut -m fomalhaut.tests.load_config
-  - sleep 3
-  - coverage run --source=fomalhaut -m fomalhaut.runserver &
-  - sleep 3
-  - coverage run --source=fomalhaut -m fomalhaut.tests.api_server &
-  - sleep 3
+  - sleep 1
+  - python -m fomalhaut.tests.load_config
+  - sleep 1
+  - python -m fomalhaut.runserver &
+  - sleep 1
+  - python -m fomalhaut.tests.api_server &
+  - sleep 1
 
 script:
 #  - python -m unittest discover -s fomalhaut -p "*_test.py"

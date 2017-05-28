@@ -79,7 +79,7 @@ class APIAuthTest(unittest.TestCase):
         r = req.post('/resource/', json=json_data)
 
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(utf8(r.content), utf8(body))
+        self.assertEqual(utf8(json.dumps(r.json())), utf8(body))
 
     def test_post_img(self):
         client = APIClient(self.access_key, self.secret_key, self.api_server)

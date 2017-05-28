@@ -12,7 +12,7 @@ import random
 import sys
 import time
 import traceback
-import ujson
+
 import uuid
 from base64 import urlsafe_b64encode
 from concurrent.futures import ThreadPoolExecutor
@@ -33,6 +33,11 @@ from fomalhaut.settings import CONFIG_CACHE_EXPIRE_SECONDS, \
     CLIENT_CONFIG_REDIS_PREFIX, THREAD_POOL_EXECUTOR_WORKER_NUM, \
     ACCESS_TOKEN_REDIS_PREFIX, REFRESH_TOKEN_REDIS_PREFIX, \
     ASYNC_HTTP_CLIENT_MAX_CLIENTS
+
+try:
+    import ujson as json
+except:
+    import json
 
 __all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
@@ -251,7 +256,7 @@ def new_random_token():
 
 def json_loads(data):
     try:
-        return ujson.loads(data) if data else None
+        return json.loads(data) if data else None
     except Exception as e:
         logger.error(e)
         logger.error(traceback.format_exc())
@@ -260,7 +265,7 @@ def json_loads(data):
 
 
 def json_dumps(data, ensure_ascii=True):
-    return ujson.dumps(data, ensure_ascii)
+    return json.dumps(data, ensure_ascii)
 
 
 class CachedConfigHandler(object):
@@ -451,9 +456,9 @@ class RedisHelper(object):
 
 
 if __name__ == '__main__':
-    aes = AESCipher('123')
-    data = aes.encrypt('123')
-    print(data)
-    plain = aes.decrypt(data)
-    print(plain)
+    # aes = AESCipher('123')
+    # d = aes.encrypt('123')
+    # print(d)
+    # plain = aes.decrypt(d)
+    # print(plain)
     pass
