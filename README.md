@@ -65,7 +65,7 @@ REDIS_PASSWORD = 'your_password'
 
 这是一个 JSON API 的网关，实际上不管背后受保护的 API 传输的是什么，都能正常传输，只是网关会在出错时，以 JSON 数据返回错误信息。在设计上借鉴了 [torngas](https://github.com/mqingyn/torngas) 的中间件模式。当前仅支持 `GET` 和 `POST` 方法。
 
-![img.png](doc/design.png "")
+![img.png](docs/design.png "")
 
 ### HMAC 签名
 
