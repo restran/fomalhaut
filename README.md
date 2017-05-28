@@ -23,9 +23,9 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 
 ## 环境及依赖
 
-支持的 Python 版本: 2.7, 3.3, 3.4, 3.5, pypy, pypy3
+支持的 Python 版本: 2.7, 3.3, 3.4, 3.5, 3.6 pypy, pypy3
 
-需要先安装 Redis 和 MongoDB，相应的依赖包可以通过以下命令安装:
+需要先安装 Redis，相应的依赖包可以通过以下命令安装:
 
     pip install -r requirements.txt
 
@@ -147,3 +147,4 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 - [ ] Rate-Limiting
 - [ ] api-android-client
 - [ ] api-swift-client
+# api-gateway
