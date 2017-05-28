@@ -86,9 +86,9 @@ before_script:
 script:
 #  - python -m unittest discover -s fomalhaut -p "*_test.py"
   - coverage run -p --source=fomalhaut -m unittest discover -s fomalhaut -p "test_*.py"
-
-after_success:
   - coverage run -p -m fomalhaut.tests.stop_server
   - coverage combine
   - coverage report
-  - coveralls
+
+after_success:
+  coveralls
