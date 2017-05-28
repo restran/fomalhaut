@@ -18,7 +18,7 @@ from base64 import urlsafe_b64encode
 from concurrent.futures import ThreadPoolExecutor
 from copy import copy
 from importlib import import_module
-
+import ujson
 import redis
 from Crypto import Random
 from Crypto.Cipher import AES
@@ -56,7 +56,7 @@ if PY3:
     binary_type = bytes
 else:
     from cStringIO import StringIO as BytesIO
-    
+
     text_type = unicode
     binary_type = str
 
@@ -243,12 +243,16 @@ def new_random_token():
 
 def json_loads(data):
     try:
-        return json_decode(data) if data else None
+        return ujson.loads(data) if data else None
     except Exception as e:
         logger.error(e)
         logger.error(traceback.format_exc())
 
     return None
+
+
+def json_dumps(data, ensure_ascii=True):
+    return ujson.dumps(data, ensure_ascii)
 
 
 class CachedConfigHandler(object):
@@ -400,7 +404,7 @@ class RedisHelper(object):
             if not can_set_a or not can_set_r:
                 return None
 
-            json_data = json.dumps(token_info)
+            json_data = json_dumps(token_info)
             key_a = '%s:%s' % (ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
             pipe = cls.get_client().pipeline()
             # 如果是用 StrictRedis, time 和 value 顺序不一样

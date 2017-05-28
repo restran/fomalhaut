@@ -4,11 +4,10 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import json
 import logging
 import sys
-import traceback
 import time
+import traceback
 
 from tornado import gen
 from tornado.concurrent import is_future
@@ -19,7 +18,7 @@ from ..middleware.analytics import AnalyticsData
 from ..middleware.base import ResultCode
 from ..middleware.exceptions import *
 from ..settings import GATEWAY_ERROR_STATUS_CODE, HEADER_X_TIMESTAMP
-from ..utils import text_type, copy_list
+from ..utils import text_type, copy_list, json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -116,11 +115,11 @@ class BaseHandler(RequestHandler):
             self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
             error_msg = '500 Internal Error'
 
-        json_str = json.dumps({
+        json_str = json_dumps({
             'code': self.analytics.result_code,
             'value': None,
             'message': error_msg
-        }, ensure_ascii=False)
+        })
         # logger.debug(json_str)
         try:
             self.write(json_str)

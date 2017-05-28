@@ -13,7 +13,7 @@ from ..i18n import PromptMessage
 from ..middleware.base import BaseMiddleware, ResultCode
 from ..middleware.exceptions import ClientErrorException
 from ..settings import HEADER_BACKEND_USER_JSON, HEADER_X_ACCESS_TOKEN
-from ..utils import RedisHelper, utf8, to_unicode
+from ..utils import RedisHelper, utf8, to_unicode, json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class AuthAccessTokenMiddleware(BaseMiddleware):
             handler.client.user_info = user_info
             try:
                 # 将该 App 登录的用户信息传递给后端 Web
-                json_str = json.dumps(user_info, ensure_ascii=False)
+                json_str = json_dumps(user_info)
                 # 用户信息使用 json 存储，并编码为 base64
                 request.headers[HEADER_BACKEND_USER_JSON] = to_unicode(b64encode(utf8(json_str)))
             except Exception as e:

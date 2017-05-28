@@ -7,12 +7,8 @@ import logging
 import os
 import unittest
 
-import requests
-from cerberus import Validator
-
+from fomalhaut.settings import PORT as API_SERVER_PORT
 from fomalhaut.tests.api_client import APIClient, APIRequest
-from fomalhaut.handlers.endpoints.base import APIStatusCode
-from fomalhaut.settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
 from fomalhaut.utils import *
 
 logger = logging.getLogger(__name__)
@@ -39,7 +35,7 @@ class AESTest(unittest.TestCase):
             'c': '中文'
         }
 
-        body = json.dumps(json_data, ensure_ascii=False)
+        body = json.dumps(json_data)
         r = req.post('/resource/', json=json_data)
 
         self.assertEqual(r.status_code, 200)

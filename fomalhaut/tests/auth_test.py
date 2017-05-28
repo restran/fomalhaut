@@ -76,7 +76,7 @@ class APIAuthTest(unittest.TestCase):
             'c': '中文'
         }
 
-        body = json.dumps(json_data, ensure_ascii=False)
+        body = json.dumps(json_data)
         r = req.post('/resource/', json=json_data)
 
         self.assertEqual(r.status_code, 200)
@@ -122,11 +122,11 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             },
-            'value': {
+            'data': {
                 'type': 'dict',
                 'required': True,
             }
@@ -135,8 +135,8 @@ class AuthEndpointTest(unittest.TestCase):
         self.assertEqual(v.validate(r.json()), True)
 
         # 测试access_token存活性
-        access_token = r.json()['value']['access_token']
-        refresh_token = r.json()['value']['refresh_token']
+        access_token = r.json()['data']['access_token']
+        refresh_token = r.json()['data']['refresh_token']
         json_data = {
             'access_token': access_token
         }
@@ -150,7 +150,7 @@ class AuthEndpointTest(unittest.TestCase):
         }
         r = req.post('/token/alive/', json=json_data)
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(r.json()['value']['expires_in'] < 0, True)
+        self.assertEqual(r.json()['data']['expires_in'] < 0, True)
 
         # refresh_token
         json_data = {
@@ -171,7 +171,7 @@ class AuthEndpointTest(unittest.TestCase):
 
         auth_req = APIRequest(client, 'test_api_login', 'v1')
 
-        access_token = r.json()['value']['access_token']
+        access_token = r.json()['data']['access_token']
         ar = auth_req.post('/protected/?access_token=%s' % access_token,
                            json=json_data)
         self.assertEqual(r.status_code, 200)
@@ -195,7 +195,7 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             }
@@ -220,21 +220,22 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             },
-            'value': {
+            'data': {
                 'type': 'dict',
                 'required': True,
             }
         }
         v = Validator(schema=schema, allow_unknown=True)
+        logger.info(r.json())
         self.assertEqual(v.validate(r.json()), True)
 
         # refresh_token
         json_data = {
-            'refresh_token': r.json()['value']['refresh_token']
+            'refresh_token': r.json()['data']['refresh_token']
         }
         logger.debug(json_data)
 
@@ -251,7 +252,7 @@ class AuthEndpointTest(unittest.TestCase):
 
         auth_req = APIRequest(client, 'test_api_login', 'v1')
 
-        access_token = r.json()['value']['access_token']
+        access_token = r.json()['data']['access_token']
         ar = auth_req.post('/protected/?access_token=%s' % access_token,
                            json=json_data)
         self.assertEqual(r.status_code, 200)
@@ -270,7 +271,7 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             }
@@ -295,11 +296,11 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             },
-            'value': {
+            'data': {
                 'type': 'dict',
                 'required': True,
             }
@@ -309,7 +310,7 @@ class AuthEndpointTest(unittest.TestCase):
 
         # refresh_token
         json_data = {
-            'refresh_token': r.json()['value']['refresh_token']
+            'refresh_token': r.json()['data']['refresh_token']
         }
         logger.debug(json_data)
 
@@ -326,7 +327,7 @@ class AuthEndpointTest(unittest.TestCase):
 
         auth_req = APIRequest(client, 'test_api_login', 'v1', encrypt_type='aes')
 
-        access_token = r.json()['value']['access_token']
+        access_token = r.json()['data']['access_token']
         ar = auth_req.post('/protected/?access_token=%s' % access_token,
                            json=json_data)
         self.assertEqual(r.status_code, 200)
@@ -344,7 +345,7 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             }
@@ -369,13 +370,13 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             }
         }
 
-        access_token = r.json()['value']['access_token']
+        access_token = r.json()['data']['access_token']
         json_data = {
             'new_password': '123',
             'old_password': '456'
@@ -408,13 +409,13 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'message': {
+            'msg': {
                 'type': 'string',
                 'required': True,
             }
         }
 
-        access_token = r.json()['value']['access_token']
+        access_token = r.json()['data']['access_token']
         json_data = {
             'new_password': '123',
             'old_password': '456'

@@ -16,7 +16,7 @@ from tornado.httputil import HTTPHeaders
 from fomalhaut.i18n import PromptMessage
 from fomalhaut.settings import HEADER_BACKEND_APP_ID, \
     HEADER_BACKEND_USER_JSON
-from fomalhaut.utils import text_type
+from fomalhaut.utils import text_type, json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -100,37 +100,32 @@ class BuiltinAPIHandler(object):
 
         self.set_header("Content-Type", "application/json; charset=utf-8")
 
-    def success(self, data=None, msg=''):
-        json_str = json.dumps({
-            'code': APIStatusCode.SUCCESS, 'value': data,
-            'message': msg}, ensure_ascii=False)
+    def _write_json(self, code, data, msg):
+        ret_data = {
+            'code': code,
+            'data': data,
+            'msg': msg
+        }
+        # ensure_ascii=False，确保中文不会被转成 unicode 字符串格式
+        json_str = json_dumps(ret_data, ensure_ascii=True)
         try:
             self.write(json_str)
             self.finish()
         except Exception as e:
             logger.error(e)
+            logger.error(traceback.format_exc())
+
+    def success(self, data=None, msg=''):
+        self._write_json(APIStatusCode.SUCCESS, data, msg)
 
     def fail(self, data=None, msg='', code=APIStatusCode.FAIL):
-        json_str = json.dumps({
-            'code': code, 'value': data, 'message': msg
-        }, ensure_ascii=False)
-
-        try:
-            self.write(json_str)
-            self.finish()
-        except Exception as e:
-            logger.error(e)
+        self._write_json(code, data, msg)
 
     def error(self, data=None, msg='', code=APIStatusCode.ERROR):
-        json_str = json.dumps({
-            'code': code, 'message': data, 'value': msg
-        }, ensure_ascii=False)
-        logger.debug(json_str)
-        try:
-            self.write(json_str)
-            self.finish()
-        except Exception as e:
-            logger.error(e)
+        self._write_json(code, data, msg)
+
+    def forbidden(self, data=None, msg='', code=APIStatusCode.FORBIDDEN):
+        self._write_json(code, data, msg)
 
 
 class LoginRequiredHandler(BuiltinAPIHandler):

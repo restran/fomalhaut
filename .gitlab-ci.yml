@@ -1,0 +1,56 @@
+test:python2.7:
+  image: python:2.7
+  services:
+    - redis:3.2
+  before_script:
+  - export PIP_CACHE_DIR="/opt/cache/pip"
+  - pip install -r requirements.txt
+  - pip install pytest-cov
+  - python -m fomalhaut.tests.load_config gitlab_ci
+  - sleep 2
+  - python -m fomalhaut.runserver --gitlab_ci=true &
+  - sleep 2
+  - python -m fomalhaut.tests.api_server &
+  - sleep 2
+  script:
+  - python -m unittest discover -s fomalhaut -p "*_test.py"
+  # 测试覆盖率
+  - py.test --cov-config .coveragerc --cov=fomalhaut
+
+test:python3.4:
+  image: python:3.4
+  services:
+  - redis:3.2
+  before_script:
+  - export PIP_CACHE_DIR="/opt/cache/pip"
+  - pip install -r requirements.txt
+  - pip install pytest-cov
+  - python -m fomalhaut.tests.load_config gitlab_ci
+  - sleep 2
+  - python -m fomalhaut.runserver --gitlab_ci=true &
+  - sleep 2
+  - python -m fomalhaut.tests.api_server &
+  - sleep 2
+  script:
+  - python -m unittest discover -s fomalhaut -p "*_test.py"
+  # 测试覆盖率
+  - py.test --cov-config .coveragerc --cov=fomalhaut
+
+test:pypy:
+  image: pypy:2
+  services:
+  - redis:3.2
+  before_script:
+  - export PIP_CACHE_DIR="/opt/cache/pip"
+  - pip install -r requirements.txt
+  - pip install pytest-cov
+  - pypy -m fomalhaut.tests.load_config gitlab_ci
+  - sleep 2
+  - pypy -m fomalhaut.runserver --gitlab_ci=true &
+  - sleep 2
+  - pypy -m fomalhaut.tests.api_server &
+  - sleep 2
+  script:
+  - pypy -m unittest discover -s fomalhaut -p "*_test.py"
+  # 测试覆盖率
+  - py.test --cov-config .coveragerc --cov=fomalhaut

@@ -231,7 +231,7 @@ class APIRequest(object):
         if method in ['POST', 'PUT']:
             if json is not None:
                 self.request_data.headers['Content-Type'] = 'application/json; charset=utf-8'
-                self.request_data.body = json_util.dumps(json, ensure_ascii=False)
+                self.request_data.body = json_util.dumps(json)
             else:
                 self.request_data.body = '' if data is None else data
 

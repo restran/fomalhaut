@@ -4,7 +4,6 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import json
 import time
 from base64 import b64encode
 
@@ -13,7 +12,8 @@ from tornado.ioloop import IOLoop
 
 from ..middleware.base import BaseMiddleware, ResultCode
 from ..settings import *
-from ..utils import RedisHelper, thread_pool_executor, utf8, to_unicode, UniqueId
+from ..utils import RedisHelper, thread_pool_executor, \
+    utf8, to_unicode, UniqueId, json_dumps
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class AnalyticsData(object):
 
     def save_to_redis(self):
         r = RedisHelper.get_client()
-        access_log = json.dumps(self.get_json())
+        access_log = json_dumps(self.get_json())
         key = '%s:%s' % (ANALYTICS_LOG_REDIS_PREFIX, UniqueId.new_object_id())
         # 数据存储在 key value 结构中，并设置过期时间
         r.setex(key, ANALYTICS_LOG_EXPIRE_SECONDS, access_log)

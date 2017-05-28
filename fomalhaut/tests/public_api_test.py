@@ -38,7 +38,7 @@ class ClientPublicAPITest(unittest.TestCase):
             'c': '中文'
         }
 
-        body = json.dumps(json_data, ensure_ascii=False)
+        body = json.dumps(json_data)
         r = req.post('/resource/', json=json_data)
 
         self.assertEqual(r.status_code, 200)

@@ -73,7 +73,7 @@ REDIS_PASSWORD = 'your_password'
 
 ### 特殊状态码
 
-为了区分是网关层面执行时就出现错误返回数据，还是背后真正提供服务的 API 返回的数据，定义一个特殊的`状态码 600`，如果状态码为 600，则表示网关返回的。
+为了区分是网关层面执行时就出现错误返回数据，还是背后真正提供服务的 API 返回的数据，定义一个特殊的`状态码 949`，如果状态码为 949，则表示网关返回的。
 
 ### AES 加密
 
@@ -124,7 +124,7 @@ REDIS_PASSWORD = 'your_password'
 
     http://api.example.com/api-name/v1/?access_token=abcd
 
-API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_token` 去 redis 中验证这个 `access_token` 是否有效，并获取该用户的信息。然后将用户信息存储在 Headers 中，以 `X-Api-User-Json` 传递给后端的 API。该 Header 存储的数据是 user_info 的 json 字符串的 base64 编码数据。
+API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_token` 去 redis 中验证这个 `access_token` 是否有效，并获取该用户的信息。然后将用户信息存储在 Headers 中，以 `X-User-Json` 传递给后端的 API。该 Header 存储的数据是 user_info 的 json 字符串的 base64 编码数据。
 
 ## 部署和使用
 
@@ -132,7 +132,7 @@ API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_
 
 ### 访问日志存储
 
-为了加快速度, api-gateway 产生的访问日志会临时存储在 Redis 中的列表中, 在 api-gateway-dashboard 项目中配置了一个 Celery 定期任务, 会自动将访问日志迁移到 MongoDB。因此必须同时将这些 Celery 任务同时运行起来, 才能保证 api-gateway 的正常运行。
+为了加快速度, fomalhaut 产生的访问日志会临时存储在 Redis 中的列表中, 在 api-gateway-dashboard 项目中配置了一个 Celery 定期任务, 会自动将访问日志迁移到 MongoDB。因此必须同时将这些 Celery 任务同时运行起来, 才能保证 fomalhaut 的正常运行。
 
 这些 Celery 后台任务的运行方法, 请查看 [api-gateway-dashboard](https://github.com/restran/api-gateway-dashboard) 的相关文档。
 
