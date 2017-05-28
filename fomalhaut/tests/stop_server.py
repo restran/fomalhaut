@@ -18,6 +18,7 @@ def find_pid_and_kill(cmd):
     out_list = []
     for t in s.stdout:
         t = to_unicode(t)
+        print(t)
         if 'grep' not in t:
             out_list.append(t)
 
@@ -32,7 +33,7 @@ def main():
     find_pid_and_kill('ps -A | grep fomalhaut.runserver')
     find_pid_and_kill('ps -A | grep fomalhaut.tests.api_server')
     print('wait server shutdown')
-    time.sleep(5)
+    time.sleep(3)
 
 
 if __name__ == '__main__':

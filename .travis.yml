@@ -74,18 +74,23 @@ services:
   - mongodb
 
 before_script:
-  - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
-  - sleep 1
-  - coverage run -p --source=fomalhaut -m fomalhaut.tests.load_config
-  - sleep 1
-  - coverage run -p --source=fomalhaut -m fomalhaut.runserver &
-  - sleep 1
-  - coverage run -p --source=fomalhaut -m fomalhaut.tests.api_server &
-  - sleep 1
+  - |
+    sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
+    sleep 1
+    coverage run -p --source=fomalhaut -m fomalhaut.tests.load_config
+    sleep 1
+    coverage run -p --source=fomalhaut -m fomalhaut.runserver &
+    server_pid_1=$!
+    sleep 1
+    coverage run -p --source=fomalhaut -m fomalhaut.tests.api_server &
+    server_pid_2=$!
+    sleep 1
 
 script:
 #  - python -m unittest discover -s fomalhaut -p "*_test.py"
   - coverage run -p --source=fomalhaut -m unittest discover -s fomalhaut -p "test_*.py"
+  - kill -2 $server_pid_1
+  - kill -2 $server_pid_2
   - coverage run -p --source=fomalhaut -m fomalhaut.tests.stop_server
   - coverage combine
   - coverage report
