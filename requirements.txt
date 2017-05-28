@@ -1,4 +1,5 @@
 future
+futures
 cerberus>=0.9
 requests
 tornado>=4.3
@@ -6,3 +7,4 @@ redis
 pycrypto
 pycurl
 ConcurrentLogHandler
+pymongo

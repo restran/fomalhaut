@@ -15,22 +15,29 @@ import time
 import traceback
 import uuid
 from base64 import urlsafe_b64encode
+from concurrent.futures import ThreadPoolExecutor
 from copy import copy
 from importlib import import_module
 
 import redis
 from Crypto import Random
 from Crypto.Cipher import AES
+from bson.objectid import ObjectId
 from future.builtins import chr
 from future.utils import iteritems
-from tornado.escape import json_decode, utf8, to_unicode
+from tornado.escape import json_decode, utf8, to_unicode, basestring_type
+from tornado.httpclient import AsyncHTTPClient
 
-from . import settings
+from fomalhaut import settings
+from fomalhaut.settings import CONFIG_CACHE_EXPIRE_SECONDS, \
+    CLIENT_CONFIG_REDIS_PREFIX, THREAD_POOL_EXECUTOR_WORKER_NUM, \
+    ACCESS_TOKEN_REDIS_PREFIX, REFRESH_TOKEN_REDIS_PREFIX, \
+    ASYNC_HTTP_CLIENT_MAX_CLIENTS
 
 __all__ = ['BytesIO', 'PY2', 'PY3', 'copy_list', 'AESCipher', 'utf8', 'to_unicode',
            'utf8_encoded_dict', 'RedisHelper', 'text_type', 'binary_type',
            'json_loads', 'new_random_token', 'json_decode', 'AsyncHTTPClient',
-           'CachedConfigHandler']
+           'CachedConfigHandler', 'thread_pool_executor']
 
 logger = logging.getLogger(__name__)
 
@@ -48,23 +55,24 @@ if PY3:
     text_type = str
     binary_type = bytes
 else:
-    from cStringIO import StringIO as BytesIO
 
     text_type = unicode
     binary_type = str
 
-if PYPY:
-    # curl_httpclient is faster than simple_httpclient however
-    # curl_httpclient needs pycurl which is not supported in pypy
-    from tornado.simple_httpclient import AsyncHTTPClient
-else:
-    try:
-        from tornado.curl_httpclient import CurlAsyncHTTPClient as AsyncHTTPClient
-    except ImportError:
-        from tornado.simple_httpclient import AsyncHTTPClient
+try:
+    # curl_httpclient is faster than simple_httpclient
+    AsyncHTTPClient.configure(
+        'tornado.curl_httpclient.CurlAsyncHTTPClient',
+        max_clients=ASYNC_HTTP_CLIENT_MAX_CLIENTS)
+except ImportError:
+    AsyncHTTPClient.configure(
+        'tornado.simple_httpclient.AsyncHTTPClient',
+        max_clients=ASYNC_HTTP_CLIENT_MAX_CLIENTS)
 
 # 拷贝 list
 copy_list = (lambda lb: copy(lb) if lb else [])
+# 线程池，用来异步执行任务
+thread_pool_executor = ThreadPoolExecutor(THREAD_POOL_EXECUTOR_WORKER_NUM)
 
 
 class ObjectDict(dict):
@@ -110,7 +118,10 @@ def utf8_encoded_dict(in_dict):
     """
     out_dict = {}
     for k, v in iteritems(in_dict):
-        out_dict[utf8(k)] = utf8(v)
+        if isinstance(v, basestring_type):
+            out_dict[utf8(k)] = utf8(v)
+        else:
+            out_dict[utf8(k)] = v
     return out_dict
 
 
@@ -122,8 +133,44 @@ def unicode_encoded_dict(in_dict):
     """
     out_dict = {}
     for k, v in iteritems(in_dict):
-        out_dict[to_unicode(k)] = to_unicode(v)
+        if isinstance(v, basestring_type):
+            out_dict[to_unicode(k)] = to_unicode(v)
+        else:
+            out_dict[to_unicode(k)] = v
     return out_dict
+
+
+def time_elapsed(message=''):
+    def decorator(func):
+        # @gen.coroutine
+        def wrapper(*args, **kwargs):
+            timestamp = time.time() * 1000
+
+            ret = func(*args, **kwargs)
+            # if is_future(ret):
+            #     ret = yield ret
+
+            now_ts = time.time() * 1000
+            elapsed = now_ts - timestamp
+            logger.info('%s %s: %sms' % (message, func.__name__, elapsed))
+
+            # raise gen.Return(ret)
+            return ret
+
+        return wrapper
+
+    return decorator
+
+
+class PKCS7Padding(object):
+    def __init__(self, block_size=AES.block_size):
+        self.bs = block_size
+
+    def pad(self, s):
+        return s + (self.bs - len(s) % self.bs) * utf8(chr(self.bs - len(s) % self.bs))
+
+    def unpad(self, s):
+        return s[:-ord(s[len(s) - 1:])]
 
 
 class AESCipher(object):
@@ -132,34 +179,36 @@ class AESCipher(object):
     """
 
     def __init__(self, key):
-        self.bs = 32
+        self.bs = 16
         self.key = hashlib.sha256(key.encode()).digest()
+        self.padding = PKCS7Padding(self.bs)
 
     def encrypt(self, raw):
-        raw = self._pad(raw)
+        raw = self.padding.pad(utf8(raw))
+        # AES.block_size 长度是16
+        # 每次加密都随机生成一个16个字节的IV
         iv = Random.new().read(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
+
+        # IV 保存在加密后的文本的开头
+        # IV是一个随机的分组，每次会话加密时都要使用一个新的随机IV，
+        # IV无须保密，但一定是不可预知的。由于IV的随机性，IV将使得后续的密文分组都因为IV而随机化
+        # https://www.zhihu.com/question/26437065
         return to_unicode(base64.b64encode(iv + cipher.encrypt(raw)))
 
     def decrypt(self, enc):
-        logger.debug(type(enc))
-        enc = base64.b64decode(enc)
+        # logger.debug(type(enc))
+        enc = base64.b64decode(utf8(enc))
+        # AES.block_size 长度是16
         iv = enc[:AES.block_size]
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        plain = self._unpad(cipher.decrypt(enc[AES.block_size:]))
+        plain = self.padding.unpad(cipher.decrypt(enc[AES.block_size:]))
         try:
             # 如果是字节流, 比如图片, 无法用 utf-8 编码解码成 unicode 的字符串
             return plain.decode('utf-8')
         except Exception as e:
-            logger.warning(e)
+            logger.debug(e)
             return plain
-
-    def _pad(self, s):
-        return s + (self.bs - len(s) % self.bs) * utf8(chr(self.bs - len(s) % self.bs))
-
-    @staticmethod
-    def _unpad(s):
-        return s[:-ord(s[len(s) - 1:])]
 
 
 class UniqueId(object):
@@ -171,14 +220,19 @@ class UniqueId(object):
         pass
 
     @classmethod
-    def new_object_id(cls):
+    def new_unique_id(cls):
         # uuid1 由MAC地址、当前时间戳、随机数生成。可以保证全球范围内的唯一性
         # 加上进程id, pid后, 可以保证同一台机器多进程的情况下不会出现冲突
-        return '%s-%s' % (PID, text_type(uuid.uuid1()).replace('-', ''))
+        return '%s-%s' % (PID, uuid.uuid1())
+
+    @classmethod
+    def new_object_id(cls):
+        # 使用 MongoDB 的 OjectId 来生成唯一的 Id，长度24字节
+        return '%s' % ObjectId()
 
 
 def new_random_token():
-    to_hash = UniqueId.new_object_id() + text_type(random.random())
+    to_hash = '%s%s' % (UniqueId.new_unique_id(), random.random())
     token = hashlib.sha1(utf8(to_hash)).digest()
     # 不能用 base64 因为有些字符不能用在 url 上, 比如 + 号会变成空格, 导致 access_token 作为 url 的参数时会出错
     token = to_unicode(urlsafe_b64encode(token).rstrip(b'='))
@@ -202,21 +256,22 @@ class CachedConfigHandler(object):
     """
     _cached_config = {}
     _last_clear_ts = 0
-    _clear_time = 1000 * settings.CONFIG_CACHE_EXPIRE_SECONDS
+    _clear_time = 1000 * CONFIG_CACHE_EXPIRE_SECONDS
 
     @classmethod
-    def get_client_config(cls, access_key):
+    def get_client_config(cls, app_id):
         now_ts = int(time.time())
-        cls._clear_expired_config(now_ts)
 
-        config = cls._cached_config.get(access_key)
+        config = cls._cached_config.get(app_id)
         if config:
             ts = config['ts']
-            if now_ts - ts <= settings.CONFIG_CACHE_EXPIRE_SECONDS:
+            if now_ts - ts <= CONFIG_CACHE_EXPIRE_SECONDS:
                 return config['data']
+            else:
+                cls._clear_expired_config(now_ts)
 
-        config_data = RedisHelper.get_client_config(access_key)
-        cls._cached_config[access_key] = {'ts': now_ts, 'data': config_data}
+        config_data = RedisHelper.get_client_config(app_id)
+        cls._cached_config[app_id] = {'ts': now_ts, 'data': config_data}
         return config_data
 
     @classmethod
@@ -230,8 +285,8 @@ class CachedConfigHandler(object):
             cls._cached_config = {
                 k: v
                 for k, v in iteritems(cls._cached_config)
-                if now_ts - v['ts'] <= settings.CONFIG_CACHE_EXPIRE_SECONDS
-                }
+                if now_ts - v['ts'] <= CONFIG_CACHE_EXPIRE_SECONDS
+            }
             cls._last_clear_ts = now_ts
 
 
@@ -253,60 +308,83 @@ class RedisHelper(object):
         return RedisHelper._client
 
     @classmethod
-    def get_client_config(cls, access_key):
+    def get_client_config(cls, app_id):
         """
         获取 client 配置
-        :param access_key:
+        :param app_id:
         :return:
         """
         config_data = cls.get_client().get(
-            '%s:%s' % (settings.CLIENT_CONFIG_REDIS_PREFIX, access_key))
+            '%s:%s' % (CLIENT_CONFIG_REDIS_PREFIX, app_id))
 
         # logger.debug(config_data)
         # 数据全部是存json
         return json_loads(config_data)
 
     @classmethod
-    def get_access_token_info(cls, access_token):
-        """
-        获取 client 配置
-        :param access_token:
-        :return:
-        """
-        token_info = cls.get_client().get(
-            '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, access_token))
-
-        logger.debug(token_info)
-        # 数据全部是存 json
-        return json_loads(token_info)
-
-    @classmethod
-    def get_refresh_token_info(cls, refresh_token):
+    def get_token_info(cls, access_token=None, refresh_token=None):
         """
         获取 client 配置
         :param refresh_token:
+        :param access_token:
         :return:
         """
-        token_info = cls.get_client().get(
-            '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, refresh_token))
-
-        logger.debug(token_info)
+        if access_token is not None:
+            token_info = cls.get_client().get(
+                '%s:%s' % (ACCESS_TOKEN_REDIS_PREFIX, access_token))
+        elif refresh_token is not None:
+            token_info = cls.get_client().get(
+                '%s:%s' % (REFRESH_TOKEN_REDIS_PREFIX, refresh_token))
+        else:
+            return None
+        # logger.debug(token_info)
         # 数据全部是存 json
         return json_loads(token_info)
 
     @classmethod
+    def get_access_token_ttl(cls, access_token):
+        """
+        获取 access_token 剩余的过期时间
+        :param access_token:
+        :return:
+        """
+
+        return cls.get_client().ttl(
+            '%s:%s' % (ACCESS_TOKEN_REDIS_PREFIX, access_token))
+
+    @classmethod
     def clear_token_info(cls, access_token=None, refresh_token=None):
-        if access_token:
-            token_info = cls.get_access_token_info(access_token)
-        elif refresh_token:
-            token_info = cls.get_refresh_token_info(refresh_token)
+        """
+        传入一个 access_token 或者 refresh_token 就会自动删除
+        相关的 access_token 和 refresh_token
+        :param access_token:
+        :param refresh_token:
+        :return:
+        """
+        if access_token is not None:
+            token_info = cls.get_token_info(access_token=access_token)
+        elif refresh_token is not None:
+            token_info = cls.get_token_info(refresh_token=refresh_token)
         else:
             return
 
         if token_info:
-            k_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
-            k_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
+            k_a = '%s:%s' % (ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
+            k_r = '%s:%s' % (REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
             cls.get_client().delete(k_a, k_r)
+
+    @classmethod
+    def set_token(cls, redis_prefix, token_name, token_info):
+        count = 3
+        while count > 0:
+            token = new_random_token()
+            k_a = '%s:%s' % (redis_prefix, token)
+            v = cls.get_client().get(k_a)
+            if v is None:
+                token_info[token_name] = token
+                return True
+        else:
+            return False
 
     @classmethod
     def set_token_info(cls, token_info, access_token_ex, refresh_token_ex):
@@ -314,39 +392,19 @@ class RedisHelper(object):
         插入 access_token 和 refresh_token 到 redis 中
         :return:
         """
-        count = 3
-        can_set_a = False
-        while count > 0:
-            access_token = new_random_token()
-            k_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, access_token)
-            v = cls.get_client().get(k_a)
-            if v is None:
-                token_info['access_token'] = access_token
-                can_set_a = True
-                break
-
-        count = 3
-        can_set_r = False
-        while count > 0:
-            count -= 1
-            refresh_token = new_random_token()
-            k_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, refresh_token)
-            v = cls.get_client().get(k_r)
-            if v is None:
-                token_info['refresh_token'] = refresh_token
-                can_set_r = True
-                break
-
-        if not can_set_a or not can_set_r:
-            return None
-
         try:
+            can_set_a = cls.set_token(ACCESS_TOKEN_REDIS_PREFIX, 'access_token', token_info)
+            can_set_r = cls.set_token(REFRESH_TOKEN_REDIS_PREFIX, 'refresh_token', token_info)
+
+            if not can_set_a or not can_set_r:
+                return None
+
             json_data = json.dumps(token_info)
-            key_a = '%s:%s' % (settings.ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
+            key_a = '%s:%s' % (ACCESS_TOKEN_REDIS_PREFIX, token_info['access_token'])
             pipe = cls.get_client().pipeline()
             # 如果是用 StrictRedis, time 和 value 顺序不一样
             pipe.setex(key_a, access_token_ex, json_data)
-            key_r = '%s:%s' % (settings.REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
+            key_r = '%s:%s' % (REFRESH_TOKEN_REDIS_PREFIX, token_info['refresh_token'])
             pipe.setex(key_r, refresh_token_ex, json_data)
             pipe.execute()
         except Exception as e:
@@ -370,6 +428,10 @@ class RedisHelper(object):
         创建连接
         :return:
         """
+        # not to use the connection pooling when using the redis-py client in Tornado applications
+        # http://stackoverflow.com/questions/5953786/how-do-you-properly-query-redis-from-tornado/15596969#15596969
+        # 注意这里必须是 settings.REDIS_HOST
+        # 否则在 runserver 中若修改了 settings.REDIS_HOST，这里就不能生效
         RedisHelper._client = redis.StrictRedis(
             host=settings.REDIS_HOST, port=settings.REDIS_PORT,
             db=settings.REDIS_DB, password=settings.REDIS_PASSWORD)

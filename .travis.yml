@@ -17,17 +17,17 @@ services:
 
 before_script:
   - sudo redis-server /etc/redis/redis.conf --requirepass 'secret'
-  - sleep 5
-  - python -m beluga.tests.load_config
   - sleep 3
-  - python -m beluga.runserver &
+  - python -m fomalhaut.tests.load_config
   - sleep 3
-  - python -m beluga.tests.api_server &
+  - python -m fomalhaut.runserver &
+  - sleep 3
+  - python -m fomalhaut.tests.api_server &
   - sleep 3
 
 script:
-#  - python -m unittest discover -s beluga -p "*_test.py"
-  - coverage run --source=beluga -m unittest discover -s beluga -p "*_test.py"
+#  - python -m unittest discover -s fomalhaut -p "*_test.py"
+  - coverage run --source=fomalhaut -m unittest discover -s fomalhaut -p "*_test.py"
 
 after_success:
   coveralls

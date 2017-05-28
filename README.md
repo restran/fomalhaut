@@ -1,9 +1,9 @@
-# Beluga
+# Fomalhaut
 
 [![travis-ci](https://travis-ci.org/restran/api-gateway.svg?branch=master)](https://travis-ci.org/restran/api-gateway)
 [![Coverage Status](https://coveralls.io/repos/github/restran/api-gateway/badge.svg?branch=master)](https://coveralls.io/github/restran/api-gateway?branch=master)
 
-Beluga is an api gateway acts as the frontend and api router for numerous backend json api servers.
+fomalhaut is an api gateway acts as the frontend and api router for numerous backend json api servers.
 
 This project is still in development, api may change anytime. If you want to use it, fix what you need.
 
@@ -13,7 +13,7 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 2. 如何控制不同 App 对多种多样 API 的访问权限？
 3. API 的访问情况怎样，日志如何查看？
 
-于是，就有了 Beluga (API Gateway) 这个项目。
+于是，就有了 fomalhaut 这个项目。
 
 ## 类似项目
 
@@ -49,18 +49,11 @@ REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
 REDIS_PASSWORD = 'your_password'
-
-# MongoDB 配置
-MONGO_HOST = '127.0.0.1'
-MONGO_PORT = 27017
-MONGO_USERNAME = 'api_gateway_user'
-MONGO_PASSWORD = 'api_gateway_password'
-MONGO_DBNAME = 'api_gateway'
 ```
 
 运行
 
-    python -m beluga.runserver --port=6500
+    python -m fomalhaut.runserver --port=6500
 
 ## 相关项目
 
@@ -76,7 +69,7 @@ MONGO_DBNAME = 'api_gateway'
 
 ### HMAC 签名
 
-和大多数的云应用一样，每个 Client 将会分配一对 `access_key` 和 `sercret_key`。`access_key` 用来唯一标识这个 Client，`sercret_key` 则用来执行 HMAC 签名和 AES 加密。API 请求的 URL 和 Body 数据都会被 `secret_key` 签名，并且会双向验证数据的签名，保证请求和返回的数据没有被篡改。签名方法采用了 HMAC-SHA256。
+和大多数的云应用一样，每个 Client 将会分配一对 `access_key` 和 `secret_key`。`access_key` 用来唯一标识这个 Client，`secret_key` 则用来执行 HMAC 签名和 AES 加密。API 请求的 URL 和 Body 数据都会被 `secret_key` 签名，并且会双向验证数据的签名，保证请求和返回的数据没有被篡改。签名方法采用了 HMAC-SHA256。
 
 ### 特殊状态码
 
@@ -88,13 +81,15 @@ MONGO_DBNAME = 'api_gateway'
 
 ### 登录校验
 
-存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。api-gateway 内置了 Auth Endpoint (endpoint_name: auth, version: v1), 包含了三个 API:
+存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。fomalhaut 内置了 Auth Endpoint (endpoint_name: auth, version: v1), 包含了三个 API:
 
-1. `/login/` 登录
-2. `/logout/` 注销
-3. `/token/` 用 `refresh_token` 获取新的 `access_token`
+1. `/auth/v1/login/` 登录
+2. `/auth/v1/token/refresh/` 用 `refresh_token` 获取新的 `access_token`
+3. `/auth/v1/token/alive/` 校验 `access_token` 是否有效
+4. `/account/v1/logout/` 注销
+5. `/account/v1/password/change/` 修改密码
 
-对于需要登录的 API，则需要先访问 `/login/` 获取 `access_token`, 返回的数据如下:
+对于需要登录的 API，则需要先访问 `/auth/v1/login/` 获取 `access_token`, 返回的数据如下:
 
 ```json
 {
@@ -103,7 +98,7 @@ MONGO_DBNAME = 'api_gateway'
     "data": {
         "access_token": "abcd",
         "refersh_token": "efgh",
-        "expires_in": 1456512810,
+        "expires_in": 168000,
         "user_info": {
         
         }
@@ -111,13 +106,13 @@ MONGO_DBNAME = 'api_gateway'
 }
 ```
 
-- `expires_in`：`access_token` 的过期时间
-- `refersh_token`：当 `access_token` 过期时，用来获取新的 `access_token`
+- `expires_in`：`access_token` 将在多少秒之后过期
+- `refresh_token`：当 `access_token` 过期时，用来获取新的 `access_token`
 - `user_info`：Auth API 返回的用户信息
 
-`/login/` API 会根据配置的 Auth API 去校验提交的登录信息是否正确，如果登录正确 Auth API 返回用户信息。
+`/auth/v1/login/` API 会根据配置的 Auth API 去校验提交的登录信息是否正确，如果登录正确 Auth API 返回用户信息。
 
-`/token/` API 用来获取新的 `access_token`，提交的数据：
+`/auth/v1/token/refresh/` API 用来获取新的 `access_token`，提交的数据：
 
 ```json
 {
@@ -127,7 +122,7 @@ MONGO_DBNAME = 'api_gateway'
 
 以后访问需要登录保才能访问的 API 在 url 带上 access_token, 例如:
 
-    http://example.com/api/v1/?access_token=abcd
+    http://api.example.com/api-name/v1/?access_token=abcd
 
 API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_token` 去 redis 中验证这个 `access_token` 是否有效，并获取该用户的信息。然后将用户信息存储在 Headers 中，以 `X-Api-User-Json` 传递给后端的 API。该 Header 存储的数据是 user_info 的 json 字符串的 base64 编码数据。
 

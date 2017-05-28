@@ -4,39 +4,18 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import hashlib
 import json
 import time
 from base64 import b64encode
-from datetime import datetime
 
-from tornado import gen
+from tornado.concurrent import run_on_executor
+from tornado.ioloop import IOLoop
 
-from ..middleware.base import BaseMiddleware
+from ..middleware.base import BaseMiddleware, ResultCode
 from ..settings import *
-from ..utils import utf8, BytesIO, RedisHelper
+from ..utils import RedisHelper, thread_pool_executor, utf8, to_unicode, UniqueId
 
 logger = logging.getLogger(__name__)
-
-
-class ResultCode(object):
-    """
-    响应结果的编码
-    """
-    # 成功
-    OK = 200
-    # 请求的参数不完整
-    BAD_REQUEST = 400
-    # 登录验证失败
-    BAD_ACCESS_TOKEN = 401
-    # HMAC 鉴权失败,禁止访问
-    BAD_AUTH_REQUEST = 403
-    # 服务器处理发生异常
-    INTERNAL_SERVER_ERROR = 500
-    # 访问 endpoint server 出现错误, 服务不可用
-    REQUEST_ENDPOINT_ERROR = 503
-    # client 缺少配置,或配置有误
-    CLIENT_CONFIG_ERROR = 510
 
 
 class HTTPData(object):
@@ -44,75 +23,39 @@ class HTTPData(object):
         self.content_type = ''
         self.headers = None
         self.body = None
-        self.headers_id = None
-        self.body_id = None
 
-    def get_json(self, save_to_redis=False):
+    def get_json(self):
         j = {
-            'content_type': self.content_type,
-            'headers': self.headers_id,
-            'body': self.body_id
+            'content_type': to_unicode(self.content_type),
+            'headers': '',
+            'body': ''
         }
 
-        if not save_to_redis:
-            j['headers'] = self.headers_id,
-            j['body'] = self.body_id
-        else:
-            header_list = []
-            for k, v in self.headers.get_all():
-                header_list.append('%s: %s' % (k, v))
-            header_content = '\n'.join(header_list)
-            # 内容过长, 截断
-            if len(header_content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
-                header_content = header_content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
+        headers_dict = {} if self.headers is None else self.headers.get_all()
+        header_content = '\n'.join(['%s: %s' % (k, v) for k, v in headers_dict])
 
-            j['headers'] = b64encode(header_content)
+        # 内容过长, 截断
+        if len(header_content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
+            header_content = header_content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
 
-            if self.body is not None and len(self.body) > 0:
-                # 内容过长, 截断
-                if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
-                    body_content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
-                else:
-                    body_content = self.body
-            else:
-                body_content = ''
-
-            # TODO 这里的 base64 编码有可能会出现异常
-            # UnicodeEncodeError: 'ascii' codec can't encode characters in position 15-16: ordinal not in range(128)
-            j['body'] = b64encode(body_content)
-
-        return j
-
-    @gen.coroutine
-    def save(self, db, data_type):
-        if self.headers is not None:
-            header_list = []
-            for k, v in self.headers.get_all():
-                header_list.append('%s: %s' % (k, v))
-            content = '\n'.join(header_list)
-            if content == '':
-                self.headers_id = None
-            else:
-                # 内容过长, 截断
-                if len(content) > ACCESS_LOG_HEADERS_MAX_LENGTH:
-                    content = content[:ACCESS_LOG_HEADERS_MAX_LENGTH]
-
-                self.headers_id = yield self.write_file(
-                    db, '%s_%s' % (data_type, 'headers'), content,
-                    'text/plain', True)
-                logger.debug(self.headers_id)
+        j['headers'] = to_unicode(b64encode(utf8(header_content)))
 
         if self.body is not None and len(self.body) > 0:
             # 内容过长, 截断
             if len(self.body) > ACCESS_LOG_BODY_MAX_LENGTH:
-                content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
+                body_content = self.body[:ACCESS_LOG_BODY_MAX_LENGTH]
             else:
-                content = self.body
+                body_content = self.body
+        else:
+            body_content = ''
 
-            self.body_id = yield self.write_file(
-                db, '%s_%s' % (data_type, 'body'), content,
-                self.content_type, True)
-            logger.debug(self.body_id)
+        try:
+            j['body'] = to_unicode(b64encode(utf8(body_content)))
+        except Exception as e:
+            j['body'] = ''
+            logger.error(e)
+
+        return j
 
 
 class HTTPRequestData(HTTPData):
@@ -125,8 +68,8 @@ class HTTPRequestData(HTTPData):
         self.uri = None
         self.method = None
 
-    def get_json(self, save_to_redis=False):
-        j = super(HTTPRequestData, self).get_json(save_to_redis)
+    def get_json(self):
+        j = super(HTTPRequestData, self).get_json()
         j['method'] = self.method
         j['uri'] = self.uri
         return j
@@ -141,8 +84,8 @@ class HTTPResponseData(HTTPData):
         super(HTTPResponseData, self).__init__()
         self.status = None
 
-    def get_json(self, save_to_redis=False):
-        j = super(HTTPResponseData, self).get_json(save_to_redis)
+    def get_json(self):
+        j = super(HTTPResponseData, self).get_json()
         j['status'] = self.status
         return j
 
@@ -176,8 +119,8 @@ class AnalyticsData(object):
         self.request = HTTPRequestData()
         self.response = HTTPResponseData()
 
-    def get_json(self, save_to_redis=False):
-        json_data = {
+    def get_json(self):
+        return {
             'ip': self.ip,
             'client': {
                 'id': self.client_id,
@@ -193,41 +136,37 @@ class AnalyticsData(object):
             'elapsed': self.elapsed,
             'result_code': self.result_code,
             'result_msg': self.result_msg,
-            'request': self.request.get_json(save_to_redis),
-            'response': self.response.get_json(save_to_redis),
+            'request': self.request.get_json(),
+            'response': self.response.get_json(),
+            'accessed_at': self.timestamp
         }
-
-        if save_to_redis:
-            json_data['accessed_at'] = self.timestamp
-        else:
-            json_data['accessed_at'] = datetime.fromtimestamp(self.timestamp / 1000.0)
-
-        return json_data
-
-    @gen.coroutine
-    def save(self, database):
-        # TODO 保存请求数据和响应数据速度很慢, 影响性能
-        yield self.request.save(database, 'request')
-        yield self.response.save(database, 'response')
-        yield database.access_log.insert(self.get_json())
 
     def save_to_redis(self):
         r = RedisHelper.get_client()
-        access_log = json.dumps(self.get_json(save_to_redis=True))
-        r.rpush(ANALYTICS_LOG_REDIS_LIST_KEY, access_log)
+        access_log = json.dumps(self.get_json())
+        key = '%s:%s' % (ANALYTICS_LOG_REDIS_PREFIX, UniqueId.new_object_id())
+        # 数据存储在 key value 结构中，并设置过期时间
+        r.setex(key, ANALYTICS_LOG_EXPIRE_SECONDS, access_log)
+        # 队列里面只存储 key
+        r.rpush(ANALYTICS_LOG_REDIS_LIST_KEY, key)
 
 
-class AnalyticsHandler(BaseMiddleware):
+class AnalyticsMiddleware(BaseMiddleware):
     """
     处理访问统计
     """
+
+    def __init__(self, *args, **kwargs):
+        self.io_loop = IOLoop.current()
+        self.executor = thread_pool_executor
+        super(AnalyticsMiddleware, self).__init__(*args, **kwargs)
 
     def process_request(self):
         """
         请求开始
         :return:
         """
-        logger.debug('process_request')
+        # logger.debug('process_request')
         request = self.handler.request
         analytics = self.handler.analytics
         x_real_ip = request.headers.get('X-Real-Ip')
@@ -238,7 +177,7 @@ class AnalyticsHandler(BaseMiddleware):
         """
         在结果返回前, 先记录响应数据
         """
-        logger.debug('process_response')
+        # logger.debug('process_response')
         response_headers = self.handler.get_response_headers()
         response_body = b''.join(self.handler.get_write_buffer())
         analytics = self.handler.analytics
@@ -246,13 +185,13 @@ class AnalyticsHandler(BaseMiddleware):
         analytics.response.headers = response_headers
         analytics.response.body = response_body
 
-    @gen.coroutine
+    @run_on_executor
     def process_finished(self):
         """
         结果已经返回, 处理访问日志
         :return:
         """
-        logger.debug('process_finished')
+        # logger.debug('process_finished')
         analytics = self.handler.analytics
         analytics.response.status = self.handler.get_status()
         now_ts = int(time.time() * 1000)

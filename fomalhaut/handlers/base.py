@@ -8,15 +8,17 @@ import json
 import logging
 import sys
 import traceback
+import time
 
 from tornado import gen
 from tornado.concurrent import is_future
 from tornado.httputil import HTTPHeaders
 from tornado.web import RequestHandler
 
-from ..middleware.analytics import AnalyticsData, ResultCode
+from ..middleware.analytics import AnalyticsData
+from ..middleware.base import ResultCode
 from ..middleware.exceptions import *
-from ..settings import GATEWAY_ERROR_STATUS_CODE
+from ..settings import GATEWAY_ERROR_STATUS_CODE, HEADER_X_TIMESTAMP
 from ..utils import text_type, copy_list
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class BaseHandler(RequestHandler):
 
     def __init__(self, application, request, **kwargs):
         super(BaseHandler, self).__init__(application, request, **kwargs)
-        logger.debug('base init')
+        # logger.debug('base init')
 
         # 请求 client 的相关信息
         self.client = None
@@ -52,14 +54,14 @@ class BaseHandler(RequestHandler):
         :param mw_class:
         :return:
         """
-        logger.debug('clear_nested_middleware')
-        logger.debug(self.middleware_list)
+        # logger.debug('clear_nested_middleware')
+        # logger.debug(self.middleware_list)
         for i, m in enumerate(self.middleware_list):
             if mw_class == m:
                 self.middleware_list = self.middleware_list[:i]
                 break
 
-        logger.debug(self.middleware_list)
+                # logger.debug(self.middleware_list)
 
     def get_response_headers(self):
         return getattr(self, '_headers', HTTPHeaders())
@@ -84,6 +86,7 @@ class BaseHandler(RequestHandler):
         self.clear()
         # 因为执行了 clear，把之前设置的 header 也清理掉了，需要重新设置
         self.set_header('Content-Type', 'application/json; charset=utf-8')
+        self.set_header(HEADER_X_TIMESTAMP, text_type(int(time.time())))
 
         try:
             if status_code == GATEWAY_ERROR_STATUS_CODE:
@@ -100,18 +103,13 @@ class BaseHandler(RequestHandler):
         if any(isinstance(ex, c) for c in [APIGatewayException]):
             logger.debug('api exception: %s' % ex)
             # 根据异常,设置相应的 result_code
-            if isinstance(ex, AuthRequestException):
-                self.analytics.result_code = ResultCode.BAD_AUTH_REQUEST
-            elif isinstance(ex, ClientBadConfigException):
-                self.analytics.result_code = ResultCode.CLIENT_CONFIG_ERROR
-            elif isinstance(ex, LoginAuthException):
-                self.analytics.result_code = ResultCode.BAD_ACCESS_TOKEN
-            elif isinstance(ex, ServerErrorException):
-                self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
-            elif self.analytics.result_code is None:
+            if hasattr(ex, 'result_code'):
+                self.analytics.result_code = ex.result_code
+
+            if self.analytics.result_code is None:
                 self.analytics.result_code = ResultCode.INTERNAL_SERVER_ERROR
 
-            error_msg = '%s %s' % (status_code, get_exc_message(ex))
+            error_msg = '%s %s' % (self.analytics.result_code, get_exc_message(ex))
         else:
             logger.error(get_exc_message(ex))
             logger.error(traceback.format_exc())
@@ -119,11 +117,11 @@ class BaseHandler(RequestHandler):
             error_msg = '500 Internal Error'
 
         json_str = json.dumps({
-            'code': GATEWAY_ERROR_STATUS_CODE,
-            'data': None,
-            'msg': error_msg
-        })
-        logger.debug(json_str)
+            'code': self.analytics.result_code,
+            'value': None,
+            'message': error_msg
+        }, ensure_ascii=False)
+        # logger.debug(json_str)
         try:
             self.write(json_str)
         except Exception as e:
@@ -148,7 +146,7 @@ class BaseHandler(RequestHandler):
                 instance = mv_class(handler)
                 # 如果不提供 default, 不存在时会出现异常
                 m = getattr(instance, method_name, None)
-                logger.debug('%s, %s, %s' % (mv_class, m, method_name))
+                # logger.debug('%s, %s, %s' % (mv_class, m, method_name))
                 if m and callable(m):
                     try:
                         result = m(*args, **kwargs)
@@ -193,7 +191,6 @@ class BaseHandler(RequestHandler):
     @gen.coroutine
     def prepare(self):
         super(BaseHandler, self).prepare()
-
         logger.debug('base prepare')
         yield self._process_request(self)
 
@@ -221,27 +218,39 @@ class BaseHandler(RequestHandler):
         yield self._process_finished(self)
 
     @gen.coroutine
-    def get(self, *args, **kwargs):
+    def _do_fetch(self, method, *args, **kwargs):
         if self.real_api_handler is None:
             self.set_status(404)
             self.write('404 Not Found')
         else:
             handler = self.real_api_handler(self)
-            if not hasattr(handler, 'get'):
+            func = getattr(handler, method, None)
+            if func is None:
                 self.set_status(405)
                 self.write('405 Method Not Allowed')
             else:
-                yield handler.get(*args, **kwargs)
+                yield func(*args, **kwargs)
+
+    @gen.coroutine
+    def get(self, *args, **kwargs):
+        yield self._do_fetch('get', *args, **kwargs)
 
     @gen.coroutine
     def post(self, *args, **kwargs):
-        if self.real_api_handler is None:
-            self.set_status(404)
-            self.write('404 Not Found')
-        else:
-            handler = self.real_api_handler(self)
-            if not hasattr(handler, 'post'):
-                self.set_status(405)
-                self.write('405 Method Not Allowed')
-            else:
-                yield handler.post(*args, **kwargs)
+        yield self._do_fetch('post', *args, **kwargs)
+
+    @gen.coroutine
+    def options(self, *args, **kwargs):
+        yield self._do_fetch('options', *args, **kwargs)
+
+    @gen.coroutine
+    def head(self, *args, **kwargs):
+        yield self._do_fetch('head', *args, **kwargs)
+
+    @gen.coroutine
+    def put(self, *args, **kwargs):
+        yield self._do_fetch('put', *args, **kwargs)
+
+    @gen.coroutine
+    def delete(self, *args, **kwargs):
+        yield self._do_fetch('delete', *args, **kwargs)

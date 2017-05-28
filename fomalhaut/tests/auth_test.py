@@ -12,10 +12,10 @@ import unittest
 import requests
 from cerberus import Validator
 
-from beluga.tests.api_client import APIClient, APIRequest
-from beluga.handlers.endpoint import APIStatusCode
-from beluga.settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
-from beluga.utils import *
+from fomalhaut.tests.api_client import APIClient, APIRequest
+from fomalhaut.handlers.endpoints.base import APIStatusCode
+from fomalhaut.settings import PORT as API_SERVER_PORT, GATEWAY_ERROR_STATUS_CODE
+from fomalhaut.utils import *
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,11 @@ class APIAuthTest(unittest.TestCase):
         client = APIClient(self.access_key, self.secret_key, self.api_server)
         req = APIRequest(client, self.endpoint, self.version)
         r = req.get('/resource')
+        self.assertEqual(r.status_code, 200)
+        r = req.get('/')
+        self.assertEqual(r.status_code, 200)
+        r = req.get('')
+        logger.debug(r.content)
         self.assertEqual(r.status_code, 200)
         r = req.get('/resource/not_exist')
         self.assertEqual(r.status_code, 404)
@@ -89,51 +94,6 @@ class APIAuthTest(unittest.TestCase):
             self.assertEqual(utf8(r.content), utf8(body))
 
 
-class AESTest(unittest.TestCase):
-    def setUp(self):
-        self.access_key = 'abcd'
-        self.secret_key = '1234'
-        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
-        self.endpoint = 'test_api'
-        self.version = 'v1'
-
-    def test_aes_post(self):
-        client = APIClient(self.access_key, self.secret_key, self.api_server)
-        req = APIRequest(client, self.endpoint, self.version, encrypt_type='aes')
-
-        json_data = {
-            'a': 1,
-            'b': 'test string',
-            'c': '中文'
-        }
-
-        body = json.dumps(json_data, ensure_ascii=False)
-        r = req.post('/resource/', json=json_data)
-
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(utf8(body), utf8(r.content))
-
-    def test_aes_post_img(self):
-        client = APIClient(self.access_key, self.secret_key, self.api_server)
-        req = APIRequest(client, self.endpoint, self.version, encrypt_type='aes')
-
-        with open(IMG_FILE, 'rb') as f:
-            body = f.read()
-            r = req.post('/resource/', data=body)
-
-            self.assertEqual(r.status_code, 200)
-            self.assertEqual(utf8(r.content), utf8(body))
-
-    def test_aes_get(self):
-        client = APIClient(self.access_key, self.secret_key, self.api_server)
-        req = APIRequest(client, self.endpoint, self.version, encrypt_type='aes')
-
-        r = req.get('/resource/')
-
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(utf8('get'), utf8(r.content))
-
-
 class AuthEndpointTest(unittest.TestCase):
     def setUp(self):
         self.access_key = 'abcd'
@@ -145,6 +105,7 @@ class AuthEndpointTest(unittest.TestCase):
     def test_login_refresh_logout(self):
         client = APIClient(self.access_key, self.secret_key, self.api_server)
         req = APIRequest(client, self.endpoint, self.version)
+        req2 = APIRequest(client, 'account', 'v1')
 
         r = req.get('/login')
         print(r.content)
@@ -161,28 +122,43 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'msg': {
+            'message': {
                 'type': 'string',
                 'required': True,
             },
-            'data': {
+            'value': {
                 'type': 'dict',
                 'required': True,
             }
         }
         v = Validator(schema=schema, allow_unknown=True)
-        logger.debug(r.content)
-        logger.debug(r.json())
-        logger.debug(v.validate(r.json()))
         self.assertEqual(v.validate(r.json()), True)
+
+        # 测试access_token存活性
+        access_token = r.json()['value']['access_token']
+        refresh_token = r.json()['value']['refresh_token']
+        json_data = {
+            'access_token': access_token
+        }
+        r = req.post('/token/alive/', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        self.assertEqual(v.validate(r.json()), True)
+        # 无效的 access_token
+        json_data = {
+            'access_token': 'test_test'
+        }
+        r = req.post('/token/alive/', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['value']['expires_in'] < 0, True)
 
         # refresh_token
         json_data = {
-            'refresh_token': r.json()['data']['refresh_token']
+            'refresh_token': refresh_token
         }
         logger.debug(json_data)
 
-        r = req.post('/token', json=json_data)
+        r = req.post('/token/refresh/', json=json_data)
         self.assertEqual(r.status_code, 200)
         v = Validator(schema=schema, allow_unknown=True)
         logger.debug(r.json())
@@ -195,7 +171,87 @@ class AuthEndpointTest(unittest.TestCase):
 
         auth_req = APIRequest(client, 'test_api_login', 'v1')
 
-        access_token = r.json()['data']['access_token']
+        access_token = r.json()['value']['access_token']
+        ar = auth_req.post('/protected/?access_token=%s' % access_token,
+                           json=json_data)
+        self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        self.assertEqual(v.validate(ar.json()), True)
+
+        # 测试非法的 access_token 请求
+        r = auth_req.post('/protected/', json=json_data)
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
+        r = auth_req.post('/protected/', json=json_data,
+                          access_token='123')
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
+        # ---------------------
+        # logout
+        # 通过 headers 传递 access_token
+        r = req2.post('/logout', access_token=access_token)
+        self.assertEqual(r.status_code, 200)
+        schema = {
+            'code': {
+                'type': 'integer',
+                'required': True,
+                'allowed': [APIStatusCode.SUCCESS]
+            },
+            'message': {
+                'type': 'string',
+                'required': True,
+            }
+        }
+        v = Validator(schema=schema, allow_unknown=True)
+        self.assertEqual(v.validate(r.json()), True)
+
+    def test_sms_login_refresh_logout(self):
+        client = APIClient(self.access_key, self.secret_key, self.api_server)
+        req = APIRequest(client, self.endpoint, self.version)
+        req2 = APIRequest(client, 'account', 'v1')
+
+        json_data = {
+            'name': 'name',
+            'sms_code': '1234'
+        }
+        r = req.post('/login/?login_type=sms', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        schema = {
+            'code': {
+                'type': 'integer',
+                'required': True,
+                'allowed': [APIStatusCode.SUCCESS]
+            },
+            'message': {
+                'type': 'string',
+                'required': True,
+            },
+            'value': {
+                'type': 'dict',
+                'required': True,
+            }
+        }
+        v = Validator(schema=schema, allow_unknown=True)
+        self.assertEqual(v.validate(r.json()), True)
+
+        # refresh_token
+        json_data = {
+            'refresh_token': r.json()['value']['refresh_token']
+        }
+        logger.debug(json_data)
+
+        r = req.post('/token/refresh/', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        logger.debug(r.json())
+        self.assertEqual(v.validate(r.json()), True)
+
+        # ---------------------
+        json_data = {
+            'test': 'test'
+        }
+
+        auth_req = APIRequest(client, 'test_api_login', 'v1')
+
+        access_token = r.json()['value']['access_token']
         ar = auth_req.post('/protected/?access_token=%s' % access_token,
                            json=json_data)
         self.assertEqual(r.status_code, 200)
@@ -205,10 +261,8 @@ class AuthEndpointTest(unittest.TestCase):
         self.assertEqual(v.validate(ar.json()), True)
         # ---------------------
         # logout
-        json_data = {
-            'access_token': r.json()['data']['access_token']
-        }
-        r = req.post('/logout', json=json_data)
+
+        r = req2.post('/logout?access_token=%s' % access_token)
         self.assertEqual(r.status_code, 200)
         schema = {
             'code': {
@@ -216,7 +270,7 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'msg': {
+            'message': {
                 'type': 'string',
                 'required': True,
             }
@@ -227,10 +281,8 @@ class AuthEndpointTest(unittest.TestCase):
     def test_aes_login_refresh_logout(self):
         client = APIClient(self.access_key, self.secret_key, self.api_server)
         req = APIRequest(client, self.endpoint, self.version, encrypt_type='aes')
+        req2 = APIRequest(client, 'account', 'v1', encrypt_type='aes')
 
-        r = req.get('/login')
-        print(r.content)
-        self.assertEqual(r.status_code, 405)
         json_data = {
             'name': 'name',
             'password': 'password'
@@ -243,30 +295,25 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'msg': {
+            'message': {
                 'type': 'string',
                 'required': True,
             },
-            'data': {
+            'value': {
                 'type': 'dict',
                 'required': True,
             }
         }
         v = Validator(schema=schema, allow_unknown=True)
-        logger.debug(r.content)
-        j = json_decode(r.content)
-        logger.debug(j)
-        logger.debug(r.json())
-        logger.debug(v.validate(r.json()))
         self.assertEqual(v.validate(r.json()), True)
 
         # refresh_token
         json_data = {
-            'refresh_token': r.json()['data']['refresh_token']
+            'refresh_token': r.json()['value']['refresh_token']
         }
         logger.debug(json_data)
 
-        r = req.post('/token', json=json_data)
+        r = req.post('/token/refresh/', json=json_data)
         self.assertEqual(r.status_code, 200)
         v = Validator(schema=schema, allow_unknown=True)
         logger.debug(r.json())
@@ -279,7 +326,7 @@ class AuthEndpointTest(unittest.TestCase):
 
         auth_req = APIRequest(client, 'test_api_login', 'v1', encrypt_type='aes')
 
-        access_token = r.json()['data']['access_token']
+        access_token = r.json()['value']['access_token']
         ar = auth_req.post('/protected/?access_token=%s' % access_token,
                            json=json_data)
         self.assertEqual(r.status_code, 200)
@@ -289,10 +336,7 @@ class AuthEndpointTest(unittest.TestCase):
         self.assertEqual(v.validate(ar.json()), True)
         # ---------------------
         # logout
-        json_data = {
-            'access_token': r.json()['data']['access_token']
-        }
-        r = req.post('/logout', json=json_data)
+        r = req2.post('/logout', access_token=access_token)
         self.assertEqual(r.status_code, 200)
         schema = {
             'code': {
@@ -300,7 +344,7 @@ class AuthEndpointTest(unittest.TestCase):
                 'required': True,
                 'allowed': [APIStatusCode.SUCCESS]
             },
-            'msg': {
+            'message': {
                 'type': 'string',
                 'required': True,
             }
@@ -308,94 +352,85 @@ class AuthEndpointTest(unittest.TestCase):
         v = Validator(schema=schema, allow_unknown=True)
         self.assertEqual(v.validate(r.json()), True)
 
-
-class ClientPublicAPITest(unittest.TestCase):
-    def setUp(self):
-        self.access_key = 'public'
-        self.secret_key = ''
-        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
-        self.endpoint = 'public'
-        self.version = 'v1'
-
-    def test_post(self):
+    def test_login_change_password(self):
         client = APIClient(self.access_key, self.secret_key, self.api_server)
-        req = APIRequest(client, self.endpoint, self.version,
-                         require_hmac=False, require_response_sign=False)
+        req = APIRequest(client, self.endpoint, self.version)
+        req2 = APIRequest(client, 'account', 'v1')
 
         json_data = {
-            'a': 1,
-            'b': 'test string',
-            'c': '中文'
+            'name': 'name',
+            'password': 'password'
+        }
+        r = req.post('/login', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        schema = {
+            'code': {
+                'type': 'integer',
+                'required': True,
+                'allowed': [APIStatusCode.SUCCESS]
+            },
+            'message': {
+                'type': 'string',
+                'required': True,
+            }
         }
 
-        body = json.dumps(json_data, ensure_ascii=False)
-        r = req.post('/resource/', json=json_data)
-
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(utf8(body), utf8(r.content))
-
-    def test_post_img(self):
-        client = APIClient(self.access_key, self.secret_key, self.api_server)
-        req = APIRequest(client, self.endpoint, self.version,
-                         require_hmac=False, require_response_sign=False)
-
-        with open(IMG_FILE, 'rb') as f:
-            body = f.read()
-            r = req.post('/resource/', data=body)
-
-            self.assertEqual(r.status_code, 200)
-            self.assertEqual(utf8(r.content), utf8(body))
-
-    def test_get(self):
-        client = APIClient(self.access_key, self.secret_key, self.api_server)
-        req = APIRequest(client, self.endpoint, self.version,
-                         require_hmac=False, require_response_sign=False)
-
-        r = req.get('/resource/')
-
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(utf8('get'), utf8(r.content))
-
-
-class RawPublicAPITest(unittest.TestCase):
-    """
-    不通过 API Client 来访问, 没有带 API 网关定义的特殊 Header 来访问 public API
-    """
-
-    def setUp(self):
-        self.access_key = 'public'
-        self.secret_key = ''
-        self.api_server = 'http://127.0.0.1:%s' % API_SERVER_PORT
-        self.endpoint = 'public'
-        self.version = 'v1'
-
-    def test_post(self):
+        access_token = r.json()['value']['access_token']
         json_data = {
-            'a': 1,
-            'b': 'test string',
-            'c': '中文'
+            'new_password': '123',
+            'old_password': '456'
+        }
+        r = req2.post('/password/change', json=json_data, access_token=access_token)
+        self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        logger.debug(r.json())
+        self.assertEqual(v.validate(r.json()), True)
+        # 测试非法的 access_token 请求
+        req3 = APIRequest(client, 'test_api_login', 'v1')
+        r = req3.post('/protected/', access_token=access_token)
+        logger.debug(r.content)
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
+
+    def test_login_change_password_sms(self):
+        client = APIClient(self.access_key, self.secret_key, self.api_server)
+        req = APIRequest(client, self.endpoint, self.version)
+        req2 = APIRequest(client, 'account', 'v1')
+
+        json_data = {
+            'name': 'name',
+            'password': 'password'
+        }
+        r = req.post('/login', json=json_data)
+        self.assertEqual(r.status_code, 200)
+        schema = {
+            'code': {
+                'type': 'integer',
+                'required': True,
+                'allowed': [APIStatusCode.SUCCESS]
+            },
+            'message': {
+                'type': 'string',
+                'required': True,
+            }
         }
 
-        url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
-        r = requests.post(url, json=json_data)
+        access_token = r.json()['value']['access_token']
+        json_data = {
+            'new_password': '123',
+            'old_password': '456'
+        }
+        r = req2.post('/password/change/?change_type=sms', json=json_data, access_token=access_token)
         self.assertEqual(r.status_code, 200)
+        v = Validator(schema=schema, allow_unknown=True)
+        self.assertEqual(v.validate(r.json()), True)
+        # 测试非法的 access_token 请求
+        r = req2.post('/protected/', json=json_data, access_token=access_token)
+        self.assertEqual(r.status_code, GATEWAY_ERROR_STATUS_CODE)
 
-    def test_post_img(self):
-        url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
-        with open(IMG_FILE, 'rb') as f:
-            body = f.read()
-            r = requests.post(url, data=body)
 
-            self.assertEqual(r.status_code, 200)
-            self.assertEqual(utf8(r.content), utf8(body))
-
-    def test_get(self):
-        url = '%s/%s/%s/resource/' % (self.api_server, self.endpoint, self.version)
-        r = requests.get(url)
-
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(utf8('get'), utf8(r.content))
+def main():
+    unittest.main()
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()

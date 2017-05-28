@@ -6,11 +6,12 @@ from __future__ import unicode_literals, absolute_import
 
 import json
 import logging
-
 import tornado.web
 from tornado import ioloop, httpserver
 from tornado.escape import native_str, json_decode
 from tornado.options import define, options
+from tornado import gen
+from base64 import b64decode
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -47,8 +48,8 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def success(self, data=None, msg=''):
         json_str = json.dumps({
-            'code': APIStatusCode.SUCCESS, 'data': data,
-            'msg': msg}, ensure_ascii=False)
+            'code': APIStatusCode.SUCCESS, 'value': data,
+            'message': msg}, ensure_ascii=False)
         try:
             self.write(json_str)
             self.finish()
@@ -57,7 +58,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def fail(self, data=None, msg='', code=APIStatusCode.FAIL):
         json_str = json.dumps({
-            'code': code, 'data': data, 'msg': msg
+            'code': code, 'value': data, 'message': msg
         }, ensure_ascii=False)
 
         try:
@@ -68,7 +69,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def error(self, data=None, msg='', code=APIStatusCode.ERROR):
         json_str = json.dumps({
-            'code': code, 'data': data, 'msg': msg
+            'code': code, 'value': data, 'message': msg
         }, ensure_ascii=False)
         logger.debug(json_str)
         try:
@@ -76,6 +77,16 @@ class BaseHandler(tornado.web.RequestHandler):
             self.finish()
         except Exception as e:
             logger.error(e)
+
+
+class SleepHandler(BaseHandler):
+    @gen.coroutine
+    def get(self):
+        content_type = self.request.headers.get('Content-Type')
+        if content_type:
+            self.set_header('Content-Type', content_type)
+        yield gen.sleep(1)
+        self.write('get')
 
 
 class ResourceHandler(BaseHandler):
@@ -94,11 +105,24 @@ class ResourceHandler(BaseHandler):
         # logger.debug(self.request.body)
         self.write(self.request.body)
 
+    def head(self):
+        self.get()
+
+    def options(self):
+        self.get()
+
+    def put(self):
+        self.write('put')
+
+    def delete(self):
+        self.write('delete')
+
 
 class ForbiddenHandler(BaseHandler):
     """
     禁止访问
     """
+
     def get(self):
         self.write('forbidden get')
 
@@ -121,10 +145,52 @@ class LoginHandler(BaseHandler):
             self.fail()
 
 
+class SMSLoginHandler(BaseHandler):
+    def post(self):
+        logger.debug(self.request.body)
+        name = self.post_data['name']
+        sms_code = self.post_data['sms_code']
+        if name == 'name' and sms_code == '1234':
+            user_info = {
+                'id': 1,
+                'name': 'name'
+            }
+            self.success(user_info)
+        else:
+            self.fail()
+
+
+class ChangePasswordHandler(BaseHandler):
+    def post(self):
+        user_info = b64decode(self.request.headers['X-User-Json'])
+        user_info = json_decode(user_info)
+        logger.debug(user_info)
+        change_type = self.get_query_argument('change_type', 'password')
+        if change_type == 'sms':
+            self.success()
+        else:
+            old_password = self.post_data['old_password']
+            new_password = self.post_data['new_password']
+            if old_password != new_password:
+                self.success()
+            else:
+                self.fail()
+
+
+class SetPasswordHandler(BaseHandler):
+    def post(self):
+        user_info = b64decode(self.request.headers['X-User-Json'])
+        user_info = json_decode(user_info)
+        logger.debug(user_info)
+        new_password = self.post_data['new_password']
+        self.success(data=new_password)
+
+
 class ProtectedHandler(BaseHandler):
     """
     需要登录才能访问的 API
     """
+
     def get(self):
         self.success()
 
@@ -132,13 +198,17 @@ class ProtectedHandler(BaseHandler):
         self.success(self.post_data)
 
 
-if __name__ == '__main__':
+def main():
     options.parse_command_line()
     handlers = [
         (r'/login/?', LoginHandler),
+        (r'/login/sms/?', SMSLoginHandler),
+        (r'/password/change/?', ChangePasswordHandler),
         (r'/protected/?', ProtectedHandler),
         (r'/forbidden/?', ForbiddenHandler),
         (r'/resource/?', ResourceHandler),
+        (r'/sleep/?', SleepHandler),
+        (r'/?', ResourceHandler),
     ]
     app = tornado.web.Application(handlers=handlers, debug=True)
     options.logging = native_str('DEBUG')
@@ -148,3 +218,7 @@ if __name__ == '__main__':
 
     logger.info('api server is running on %s:%s' % (options.host, options.port))
     ioloop.IOLoop.instance().start()
+
+
+if __name__ == '__main__':
+    main()

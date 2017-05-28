@@ -3,16 +3,22 @@
 from __future__ import unicode_literals, absolute_import
 
 import redis
-
+import sys
 from .. import settings
 
 app_test = """{
-    "access_key": "abcd",
+    "app_id": "abcd",
     "login_auth_url": "http://127.0.0.1:8001/login/",
+    "sms_login_auth_url": "http://127.0.0.1:8001/login/sms/",
+    "sms_change_password_url": "http://127.0.0.1:8001/password/change/?change_type=sms",
+    "change_password_url": "http://127.0.0.1:8001/password/change/",
     "access_token_ex": 864000,
+    "refresh_token_ex": 1728000,
     "name": "test_client",
     "enable": true,
     "secret_key": "1234",
+    "memo": "",
+    "id": 3,
     "endpoints": {
         "auth:v1": {
             "unique_name": "Auth",
@@ -25,6 +31,23 @@ app_test = """{
             "is_builtin": true,
             "id": 4,
             "name": "auth",
+            "url": "",
+            "acl_rules": [],
+            "async_http_connect_timeout": 20,
+            "version": "v1",
+            "async_http_request_timeout": 20
+        },
+        "account:v1": {
+            "unique_name": "Account",
+            "enable": true,
+            "require_login": true,
+            "netloc": "",
+            "memo": "",
+            "enable_hmac": true,
+            "enable_acl": false,
+            "is_builtin": true,
+            "id": 5,
+            "name": "account",
             "url": "",
             "acl_rules": [],
             "async_http_connect_timeout": 20,
@@ -57,6 +80,7 @@ app_test = """{
                     "endpoint_id": 2
                 }
             ],
+            "skip_uri": false,
             "async_http_connect_timeout": 20,
             "version": "v1",
             "async_http_request_timeout": 20
@@ -81,19 +105,17 @@ app_test = """{
                     "endpoint_id": 3
                 }
             ],
+            "skip_uri": false,
             "async_http_connect_timeout": 20,
             "version": "v1",
             "async_http_request_timeout": 20
         }
-    },
-    "memo": "",
-    "refresh_token_ex": 1728000,
-    "id": 3
+    }
 }
 """
 
 app_public = """{
-    "access_key": "public",
+    "app_id": "public",
     "login_auth_url": "",
     "access_token_ex": 864000,
     "name": "public-app",
@@ -126,6 +148,11 @@ app_public = """{
 
 
 def main():
+    # 如果是在 gitlab-ci 环境下运行，redis 的主机需要设置为 redis，同时没有密码
+    if len(sys.argv) > 1 and sys.argv[1] == 'gitlab_ci':
+        settings.REDIS_HOST = 'redis'
+        settings.REDIS_PASSWORD = None
+
     client = redis.StrictRedis(
         host=settings.REDIS_HOST, port=settings.REDIS_PORT,
         db=settings.REDIS_DB, password=settings.REDIS_PASSWORD
