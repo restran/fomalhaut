@@ -81,9 +81,11 @@ before_script:
     sleep 1
     coverage run -p --source=fomalhaut -m fomalhaut.runserver &
     server_pid_1=$!
+    echo server_pid_1
     sleep 1
     coverage run -p --source=fomalhaut -m fomalhaut.tests.api_server &
     server_pid_2=$!
+    echo server_pid_2
     sleep 1
 
 script:
@@ -91,6 +93,7 @@ script:
   - coverage run -p --source=fomalhaut -m unittest discover -s fomalhaut -p "test_*.py"
   - kill -2 $server_pid_1
   - kill -2 $server_pid_2
+  - coverage run -p --source=fomalhaut -m fomalhaut.tests.stop_server
   - coverage combine
   - coverage report
 
