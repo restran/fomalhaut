@@ -29,7 +29,6 @@ API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了�
 
     pip install -r requirements.txt
 
-
 ## 运行
 
 配置 settings.py 

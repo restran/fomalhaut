@@ -91,7 +91,6 @@ script:
   - coverage run -p --source=fomalhaut -m unittest discover -s fomalhaut -p "test_*.py"
   - kill -2 $server_pid_1
   - kill -2 $server_pid_2
-  - coverage run -p --source=fomalhaut -m fomalhaut.tests.stop_server
   - coverage combine
   - coverage report
 
