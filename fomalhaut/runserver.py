@@ -89,15 +89,15 @@ class Application(web.Application):
 
 
 def sig_handler(sig, frame):
-    logging.warning('caught signal: %s', sig)
+    logger.warning('caught signal: %s', sig)
     tornado.ioloop.IOLoop.instance().add_callback(shutdown)
 
 
 def shutdown():
-    logging.info('stopping http server')
+    logger.info('stopping http server')
     server.stop()
 
-    logging.info('will shutdown in %s seconds...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
+    logger.info('will shutdown in %s seconds...', MAX_WAIT_SECONDS_BEFORE_SHUTDOWN)
     io_loop = tornado.ioloop.IOLoop.instance()
 
     deadline = time.time() + MAX_WAIT_SECONDS_BEFORE_SHUTDOWN
@@ -108,7 +108,7 @@ def shutdown():
             io_loop.add_timeout(now + 1, stop_loop)
         else:
             io_loop.stop()
-            logging.info('shutdown')
+            logger.info('shutdown')
 
     stop_loop()
 
@@ -136,8 +136,6 @@ def main():
 
     signal.signal(signal.SIGTERM, sig_handler)
     signal.signal(signal.SIGINT, sig_handler)
-
-    # ioloop.IOLoop.instance().start()
 
     if sys.version_info >= (3, 5) and not PYPY:
         # python 3.5 以上版本，可以使用 uvloop 来加速
