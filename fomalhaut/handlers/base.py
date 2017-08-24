@@ -228,7 +228,9 @@ class BaseHandler(RequestHandler):
                 self.set_status(405)
                 self.write('405 Method Not Allowed')
             else:
-                yield func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if is_future(result):
+                    yield result
 
     @gen.coroutine
     def get(self, *args, **kwargs):
