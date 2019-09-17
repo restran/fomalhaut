@@ -7,88 +7,84 @@ fomalhaut is an api gateway acts as the frontend and api router for numerous bac
 
 This project is still in development, api may change anytime. If you want to use it, fix what you need.
 
-API 是连接 App 和服务器数据库的桥梁，在 App 和各种 API 多了之后，对这些 API 的管理和保护就带来了一系列的问题。比如：
+API is connected to the App and the server database of the bridges, in the App and various API after for these API management and protection brings a series of problems.For example:
 
-1. 如何保护 API 不被非法访问，只能由 App 正常发起请求？
-2. 如何控制不同 App 对多种多样 API 的访问权限？
-3. API 的访问情况怎样，日志如何查看？
+1. How to protect the API from unauthorized access, only by the App initiates normal request?
+2. How to control a different App for many API access permissions?
+3. API access how to log how to view it?
 
-于是，就有了 fomalhaut 这个项目。
+Thus, it is with fomalhaut this project.
 
-## 类似项目
+## Similar items
 
 - [kong](https://getkong.org/)
 - [zuul](https://github.com/Netflix/zuul)
 - [strong-gateway](https://github.com/strongloop/strong-gateway)
 
-## 环境及依赖
+## The environment and dependencies
 
-支持的 Python 版本: 2.7, 3.3, 3.4, 3.5, 3.6 pypy, pypy3
+Supported Python versions: 2.7, 3.3, 3.4, 3.5, 3.6 pypy, pypy3
 
-需要先安装 Redis，相应的依赖包可以通过以下命令安装:
+You need to install Redis first, the corresponding dependency package can be installed by the following command:
 
     pip install -r requirements.txt
-
-## 运行
-
-配置 settings.py 
-
-```py
-# 访问签名的有效时间, 秒
+```
+## Valid time of access signature, seconds
 SIGNATURE_EXPIRE_SECONDS = 3600
 
 HOST = '127.0.0.1'
 PORT = 6500
 
-# 是否调试模式
+# Is the debug mode
 DEBUG = False
 
-# Redis 配置
+# Redis configuration
 REDIS_HOST = '127.0.0.1'
 REDIS_PORT = 6379
 REDIS_DB = 0
 REDIS_PASSWORD = 'your_password'
 ```
 
-运行
+Run
 
     python -m fomalhaut.runserver --port=6500
 
-## 相关项目
+## Related projects
 
-1. [api-gateway-dashboard](https://github.com/restran/api-gateway-dashboard) API Gateway 的 Web 控制台
-2. [api-python-client](https://github.com/restran/api-python-client) Python 版本的 API Client
+1. [api-gateway-dashboard](https://github.com/restran/api-gateway-dashboard) Web Console for API Gateway
+2. [api-python-client](https://github.com/restran/api-python-client) Python version of API Client
 
 
-## 设计说明
+## Design description
 
-这是一个 JSON API 的网关，实际上不管背后受保护的 API 传输的是什么，都能正常传输，只是网关会在出错时，以 JSON 数据返回错误信息。在设计上借鉴了 [torngas](https://github.com/mqingyn/torngas) 的中间件模式。当前仅支持 `GET` 和 `POST` 方法。
+This is a gateway to the JSON API, which actually works regardless of what is being transferred behind the protected API, except that the gateway will return an error message to the JSON data if something goes wrong. In the design of the [torngas](https://github.com/mqingyn/torngas) middleware mode. Currently only the `GET` and `POST` methods are supported.
 
 ![img.png](docs/design.png "")
 
-### HMAC 签名
+### HMAC signature
 
-和大多数的云应用一样，每个 Client 将会分配一对 `access_key` 和 `secret_key`。`access_key` 用来唯一标识这个 Client，`secret_key` 则用来执行 HMAC 签名和 AES 加密。API 请求的 URL 和 Body 数据都会被 `secret_key` 签名，并且会双向验证数据的签名，保证请求和返回的数据没有被篡改。签名方法采用了 HMAC-SHA256。
+As with most cloud applications, each Client will be assigned a pair of `access_key` and `secret_key`.`access_key` is used to uniquely identify the Client,`secret_key` is used to perform HMAC signature and AES encryption.Both the URL of the API request and the Body data are signed by `secret_key`, and the signature of the data is verified bidirectionally to ensure that the request and the returned data are not tampered with.The signature method uses the HMAC-SHA256.
 
-### 特殊状态码
+### Special status codes
 
-为了区分是网关层面执行时就出现错误返回数据，还是背后真正提供服务的 API 返回的数据，定义一个特殊的`状态码 949`，如果状态码为 949，则表示网关返回的。
+In order to distinguish the gateway level when there is an error in the implementation of the return data, or behind the real API to provide services to return data, define a special `status code 949`, if the status code is 949, then the gateway returns.
 
-### AES 加密
+### AES encryption
 
-虽然 HTTPS 正在大多数网站中普及，但是如果仍然只能使用 HTTP，或者存在中间人攻击，数据内容就存在泄漏的风险，因此提供了 AES 加密的功能，可以对传输数据的 URL、Headers、Body 都进行加密，AES 加密是可选的。
+Although HTTPS is popular in most sites, but if you still can only use HTTP, or there is a middleman attack, there is a risk of data content leakage,thus providing AES encryption function, you can transfer data URL, Headers, Body are encrypted, AES encryption is optional.
 
-### 登录校验
+### Login verification
 
-存在这样的情况，有些 API 需要登录后才能访问，有些则无需登录。fomalhaut 内置了 Auth Endpoint (endpoint_name: auth, version: v1), 包含了三个 API:
+There are cases where some APIs need to be logged in before they can be accessed, and others do not.fomalhaut has built-in Auth Endpoint (endpoint_name: auth, version: v1) and includes three APIs:
 
-1. `/auth/v1/login/` 登录
-2. `/auth/v1/token/refresh/` 用 `refresh_token` 获取新的 `access_token`
-3. `/auth/v1/token/alive/` 校验 `access_token` 是否有效
-4. `/account/v1/logout/` 注销
-5. `/account/v1/password/change/` 修改密码
+1. `/auth/v1/login/` Login
+2. `/auth/v1/token/refresh/` get new `access_token` with `refresh_token'
+3. `/auth/v1/token/alive/` check `access_token` is valid
+4. `/account/v1/logout/` logout
+5. `/account/v1/password/change/` Change Password
 
-对于需要登录的 API，则需要先访问 `/auth/v1/login/` 获取 `access_token`, 返回的数据如下:
+For APIs that require login, you need to first access `/auth/v1/login/` to get `access_token`, the data returned is as follows:
+
 
 ```json
 {
@@ -105,13 +101,13 @@ REDIS_PASSWORD = 'your_password'
 }
 ```
 
-- `expires_in`：`access_token` 将在多少秒之后过期
-- `refresh_token`：当 `access_token` 过期时，用来获取新的 `access_token`
-- `user_info`：Auth API 返回的用户信息
+- `expires_in`: `access_token` will expire after many seconds
+- `refresh_token`: when `access_token` expires, it is used to get the new `access_token`
+- `user_info`: user information returned by the Auth API
 
-`/auth/v1/login/` API 会根据配置的 Auth API 去校验提交的登录信息是否正确，如果登录正确 Auth API 返回用户信息。
+`/auth/v1/login/` API will check whether the submitted login information is correct according to the configured Auth API, if the login is correct Auth API returns the user information.
 
-`/auth/v1/token/refresh/` API 用来获取新的 `access_token`，提交的数据：
+`/auth/v1/token/refresh/`API used to fetch new `access_token`, submitted data：
 
 ```json
 {
@@ -119,30 +115,30 @@ REDIS_PASSWORD = 'your_password'
 }
 ```
 
-以后访问需要登录保才能访问的 API 在 url 带上 access_token, 例如:
+Later access requires login to access the API in the url with access_token, for example:
 
     http://api.example.com/api-name/v1/?access_token=abcd
 
-API Gateway 在遇到访问需要登录的 API 时，就会根据这个 `access_token` 去 redis 中验证这个 `access_token` 是否有效，并获取该用户的信息。然后将用户信息存储在 Headers 中，以 `X-User-Json` 传递给后端的 API。该 Header 存储的数据是 user_info 的 json 字符串的 base64 编码数据。
+API Gateway will use this `access_token` to verify the validity of the `access_token` in redis when accessing the APIs that need to be logged in, and obtain the user's information.The user information is then stored in Headers and passed to the backend API with `X-User-Json`.The data stored in this Header is base64 encoded data of the JSON string of user_info.
 
-## 部署和使用
+## Deploy and use
 
-内置的 Endpoint 需要在控制台 api-gateway-dashboard 中配置才能使用
+The built-in Endpoint needs to be configured in the console api-gateway-dashboard
 
-### 访问日志存储
+### Access log storage
 
-为了加快速度, fomalhaut 产生的访问日志会临时存储在 Redis 中的列表中, 在 api-gateway-dashboard 项目中配置了一个 Celery 定期任务, 会自动将访问日志迁移到 MongoDB。因此必须同时将这些 Celery 任务同时运行起来, 才能保证 fomalhaut 的正常运行。
+To speed things up, the access logs generated by fomalhaut are temporarily stored in the list in Redis, and a Celery scheduled task is configured in the api-gateway-dashboard project that automatically migrates the access logs to MongoDB.Therefore, these Celery tasks must be run at the same time, in order to ensure the normal operation of fomalhaut.
 
-这些 Celery 后台任务的运行方法, 请查看 [api-gateway-dashboard](https://github.com/restran/api-gateway-dashboard) 的相关文档。
+For more information about how to run these Celery background tasks, see [api-gateway-dashboard] (https://github.com/restran/api-gateway-dashboard) of the relevant documents.
 
 ## TODO
 
-- [x] 登录校验, 检查 `access_token`
-- [x] 内置登录, 注销和更新 `access_token` 的 API
-- [ ] 单点登录, 在一个地方登录, 旧的 `access_token` 和 `refresh_token` 要失效
-- [x] 访问日志存储的请求完整内容进行大小限制
-- [x] 配置信息程序内缓存
-- [ ] API 监控, 访问异常可以邮件告警
+- [x] login check, check `access_token`
+- [x] built-in login, logout and update `access_token` API
+- [ ] Single sign-on, login in one place, old `access_token` and `refresh_token` to be invalidated
+- [x] access to the log store for requesting full content for size limits
+- [x] configuration information in-program cache
+- [ ] API monitoring, access exception can mail alarm
 - [ ] Rate-Limiting
 - [ ] api-android-client
 - [ ] api-swift-client
