@@ -194,7 +194,7 @@ class BackendAPIHandler(object):
 
         # logger.debug("local response headers: %s" % self.handler._headers)
 
-        if response.code != 304:
+        if response.code != 304 and self.response_body is not None::
             # 如果 304 (Not Modified) 的话不能 write，因为在 finish() 中有检查
             # assert not self._write_buffer, "Cannot send body with 304"
             # 如果在 304 的时候仍然设置 body，有可能会导致客户端一直 pending 导致 502 bad gateway 错误
